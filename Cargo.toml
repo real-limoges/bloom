@@ -1,0 +1,44 @@
+[package]
+name = "bloom"
+version = "0.1.0"
+edition = "2024"
+description = "GPU-accelerated graph visualization engine for the browser"
+license = "BSD-3-Clause"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+wgpu = { version = "24", features = ["webgl"] }
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "Window",
+    "Document",
+    "HtmlCanvasElement",
+    "WebGl2RenderingContext",
+    "GpuDevice",
+    "GpuAdapter",
+    "Navigator",
+    "Gpu",
+    "MouseEvent",
+    "WheelEvent",
+    "KeyboardEvent",
+    "ResizeObserver",
+    "ResizeObserverEntry",
+    "DomRectReadOnly",
+    "Performance",
+] }
+log = "0.4"
+wasm-logger = "0.2"
+bytemuck = { version = "1", features = ["derive"] }
+glam = { version = "0.29", features = ["bytemuck"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[profile.release]
+opt-level = "z"       # optimize for size
+lto = true
+codegen-units = 1
+strip = true
