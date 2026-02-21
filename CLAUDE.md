@@ -79,14 +79,19 @@ pub fn do_thing_js(&self) -> Result<(), JsValue> {
 | Module | Status |
 |---|---|
 | `protocol/format.rs` | Complete — BLOM header parsing |
-| `protocol/decode.rs` | Partial — string table and node/edge decoding stubbed in, primitive readers (`read_u32`, etc.) not yet written |
+| `protocol/decode.rs` | Complete — full decoder including string table, node/edge data, and all primitive readers |
+| `protocol/mod.rs` | Complete — re-exports `Header`, `MAGIC`, `VERSION`, `Decoder` |
 | `graph/types.rs` | Complete — `Node`, `Edge`, `Graph` |
-| `graph/spatial.rs` | Exists, not yet wired into `graph/mod.rs` |
-| `layout/force.rs` | Exists (stub) |
-| `layout/barnes_hut.rs` | Stub |
-| `render/*` | All stubs — `render/mod.rs` is empty |
-| `engine.rs` | Stub |
-| `lib.rs` | Minimal scaffold, `BloomEngine` has no fields yet |
+| `graph/mod.rs` | Partial — only exports `types`; `spatial` and `algorithms` not yet wired in |
+| `graph/spatial.rs` | Empty stub |
+| `graph/algorithms.rs` | Empty stub |
+| `layout/mod.rs` | Empty stub |
+| `layout/force.rs` | Empty stub |
+| `layout/barnes_hut.rs` | Empty stub |
+| `layout/simd.rs` | Empty stub |
+| `render/*` | All empty stubs |
+| `engine.rs` | Empty stub |
+| `lib.rs` | Minimal scaffold — `BloomEngine` has no fields yet |
 
 The implementation guide at `docs/IMPLEMENTATION_GUIDE.md` tracks the phased build plan. `docs/THEORY.md` explains the concepts behind each component.
 
