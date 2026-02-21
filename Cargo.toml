@@ -38,7 +38,7 @@ glam = { version = "0.29", features = ["bytemuck"] }
 wasm-bindgen-test = "0.3"
 
 [package.metadata.wasm-pack.profile.release]
-wasm-opt = ["-Oz", "--enable-bulk-memory"]
+wasm-opt = ["-Oz", "--enable-bulk-memory", "--enable-simd"]
 
 [profile.release]
 opt-level = "z"       # optimize for size
