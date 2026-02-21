@@ -1,10 +1,10 @@
 use wasm_bindgen::prelude::*;
 
-pub mod protocol;
+pub mod engine;
 pub mod graph;
 pub mod layout;
+pub mod protocol;
 pub mod render;
-pub mod engine;
 
 #[wasm_bindgen]
 pub struct BloomEngine {
