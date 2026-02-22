@@ -82,14 +82,19 @@ pub fn do_thing_js(&self) -> Result<(), JsValue> {
 | `protocol/decode.rs` | Complete — full decoder including string table, node/edge data, and all primitive readers |
 | `protocol/mod.rs` | Complete — re-exports `Header`, `MAGIC`, `VERSION`, `Decoder` |
 | `graph/types.rs` | Complete — `Node`, `Edge`, `Graph` |
-| `graph/mod.rs` | Partial — only exports `types`; `spatial` and `algorithms` not yet wired in |
-| `graph/spatial.rs` | Empty stub |
-| `graph/algorithms.rs` | Empty stub |
+| `graph/mod.rs` | Partial — declares `types`, `spatial`, `algorithms`; `spatial` re-export commented out |
+| `graph/spatial.rs` | Complete — `AABB` + `Quadtree` (insert, query_point, subdivide) |
+| `graph/algorithms.rs` | Partial — `pagerank` implemented; `louvain`, `shortest_path`, `betweenness_centrality` are stubs |
 | `layout/mod.rs` | Empty stub |
 | `layout/force.rs` | Empty stub |
 | `layout/barnes_hut.rs` | Empty stub |
 | `layout/simd.rs` | Empty stub |
-| `render/*` | All empty stubs |
+| `render/mod.rs` | Partial — declares all submodules; no re-exports yet |
+| `render/camera.rs` | Empty stub |
+| `render/backend.rs` | Empty stub |
+| `render/nodes.rs` | Empty stub |
+| `render/edges.rs` | Empty stub |
+| `render/text.rs` | Empty stub |
 | `engine.rs` | Empty stub |
 | `lib.rs` | Minimal scaffold — `BloomEngine` has no fields yet |
 
