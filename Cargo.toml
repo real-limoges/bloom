@@ -4,19 +4,19 @@ version = "0.1.0"
 edition = "2024"
 description = "GPU-accelerated graph visualization engine for the browser"
 license = "BSD-3-Clause"
+repository = "https://github.com/real-limoges/bloom"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
-wgpu = { version = "24", features = ["webgl"] }
+wgpu = { version = "24" }
 js-sys = "0.3"
 web-sys = { version = "0.3", features = [
     "Window",
     "Document",
     "HtmlCanvasElement",
-    "WebGl2RenderingContext",
     "GpuDevice",
     "GpuAdapter",
     "Navigator",
