@@ -71,6 +71,7 @@ impl<'a> Decoder<'a> {
         Ok(labels)
     }
 
+    #[allow(clippy::type_complexity)]
     fn decode_node_data(&mut self, count: usize) -> Result<(Vec<u32>, Vec<f32>, Vec<u16>), String> {
         let ids = self.read_u32_array(count)?;
         let pageranks = self.read_f32_array(count)?;
