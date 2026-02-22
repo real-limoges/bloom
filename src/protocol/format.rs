@@ -40,15 +40,9 @@ impl Header {
         Ok(Header {
             magic,
             version,
-            node_count: u32::from_le_bytes(
-                [bytes[6], bytes[7], bytes[8], bytes[9]]
-            ),
-            edge_count: u32::from_le_bytes(
-                [bytes[10], bytes[11], bytes[12], bytes[13]]
-            ),
-            flags: u16::from_le_bytes(
-                [bytes[14], bytes[15]]
-            ),
+            node_count: u32::from_le_bytes([bytes[6], bytes[7], bytes[8], bytes[9]]),
+            edge_count: u32::from_le_bytes([bytes[10], bytes[11], bytes[12], bytes[13]]),
+            flags: u16::from_le_bytes([bytes[14], bytes[15]]),
         })
     }
 

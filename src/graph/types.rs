@@ -24,11 +24,16 @@ pub struct Graph {
 
 impl Graph {
     pub fn new(nodes: Vec<Node>, edges: Vec<Edge>) -> Self {
-        let id_to_index = nodes.iter()
+        let id_to_index = nodes
+            .iter()
             .enumerate()
             .map(|(i, node)| (node.id, i))
             .collect();
-        Self { nodes, edges, id_to_index }
+        Self {
+            nodes,
+            edges,
+            id_to_index,
+        }
     }
 
     pub fn node_count(&self) -> usize {
@@ -53,11 +58,12 @@ impl Graph {
         self.id_to_index.get(&id).copied()
     }
     pub fn neighbors(&self, node_id: u32) -> Vec<u32> {
-        self.edges.iter()
+        self.edges
+            .iter()
             .filter_map(|e| {
                 if e.source == node_id {
                     Some(e.target)
-                }  else if e.target == node_id {
+                } else if e.target == node_id {
                     Some(e.source)
                 } else {
                     None

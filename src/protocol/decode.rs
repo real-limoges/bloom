@@ -1,5 +1,5 @@
-use super::format::{Header, HEADER_SIZE};
-use crate::graph::types::{Node, Edge, Graph};
+use super::format::{HEADER_SIZE, Header};
+use crate::graph::types::{Edge, Graph, Node};
 
 pub struct Decoder<'a> {
     data: &'a [u8],
@@ -24,7 +24,8 @@ impl<'a> Decoder<'a> {
         let (ids, pageranks, degrees) = self.decode_node_data(header.node_count as usize)?;
         let (sources, targets) = self.decode_edge_data(header.edge_count as usize)?;
 
-        let nodes = ids.into_iter()
+        let nodes = ids
+            .into_iter()
             .zip(labels)
             .zip(pageranks)
             .zip(degrees)
@@ -38,7 +39,8 @@ impl<'a> Decoder<'a> {
             })
             .collect();
 
-        let edges = sources.into_iter()
+        let edges = sources
+            .into_iter()
             .zip(targets)
             .map(|(source, target)| Edge { source, target })
             .collect();
@@ -46,7 +48,7 @@ impl<'a> Decoder<'a> {
         Ok(Graph::new(nodes, edges))
     }
 
-    fn decode_string_table(&mut self, count : usize) -> Result<Vec<String>, String> {
+    fn decode_string_table(&mut self, count: usize) -> Result<Vec<String>, String> {
         let total_len = self.read_u32()? as usize;
         let offsets: Vec<u32> = (0..count)
             .map(|_| self.read_u32())
@@ -119,5 +121,4 @@ impl<'a> Decoder<'a> {
         self.offset += len;
         Ok(slice)
     }
-
 }
