@@ -1,26 +1,5 @@
 use crate::graph::types::Node;
-
-#[derive(Debug)]
-pub struct AABB {
-    pub min_x: f32,
-    pub min_y: f32,
-    pub max_x: f32,
-    pub max_y: f32,
-}
-
-impl AABB {
-    pub fn contains(&self, x: f32, y: f32) -> bool {
-        x >= self.min_x && x <= self.max_x && y >= self.min_y && y <= self.max_y
-    }
-
-    pub fn intersects_circle(&self, cx: f32, cy: f32, radius: f32) -> bool {
-        let nearest_x = cx.clamp(self.min_x, self.max_x);
-        let nearest_y = cy.clamp(self.min_y, self.max_y);
-        let dx = cx - nearest_x;
-        let dy = cy - nearest_y;
-        dx * dx + dy * dy <= radius * radius
-    }
-}
+pub use crate::spatial::AABB;
 
 pub struct Quadtree {
     bounds: AABB,
@@ -79,53 +58,8 @@ impl Quadtree {
     }
 
     fn subdivide(&mut self) {
-        let AABB {
-            min_x,
-            min_y,
-            max_x,
-            max_y,
-        } = self.bounds;
-        let mid_x = (min_x + max_x) / 2.0;
-        let mid_y = (min_y + max_y) / 2.0;
-
-        self.children = Some(Box::new([
-            Quadtree::new(
-                AABB {
-                    min_x,
-                    min_y,
-                    max_x: mid_x,
-                    max_y: mid_y,
-                },
-                self.capacity,
-            ),
-            Quadtree::new(
-                AABB {
-                    min_x: mid_x,
-                    min_y,
-                    max_x,
-                    max_y: mid_y,
-                },
-                self.capacity,
-            ),
-            Quadtree::new(
-                AABB {
-                    min_x,
-                    min_y: mid_y,
-                    max_x: mid_x,
-                    max_y,
-                },
-                self.capacity,
-            ),
-            Quadtree::new(
-                AABB {
-                    min_x: mid_x,
-                    min_y: mid_y,
-                    max_x,
-                    max_y,
-                },
-                self.capacity,
-            ),
-        ]));
+        let quads = self.bounds.subdivide();
+        self.children = Some(Box::new(quads.map(|b| Quadtree::new(b, self.capacity))));
     }
 }
 
@@ -152,24 +86,6 @@ mod tests {
             max_x: 100.0,
             max_y: 100.0,
         }
-    }
-
-    #[test]
-    fn aabb_contains() {
-        let b = world_bounds();
-        assert!(b.contains(50.0, 50.0));
-        assert!(b.contains(0.0, 0.0));
-        assert!(b.contains(100.0, 100.0));
-        assert!(!b.contains(-1.0, 50.0));
-        assert!(!b.contains(50.0, 101.0));
-    }
-
-    #[test]
-    fn aabb_intersects_circle() {
-        let b = world_bounds();
-        assert!(b.intersects_circle(50.0, 50.0, 10.0));
-        assert!(b.intersects_circle(105.0, 50.0, 10.0));
-        assert!(!b.intersects_circle(115.0, 50.0, 10.0));
     }
 
     #[test]
