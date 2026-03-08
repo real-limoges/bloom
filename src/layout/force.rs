@@ -24,7 +24,7 @@ impl ForceLayout {
         Self { params, velocities: vec![Vec2::ZERO; node_count] }
     }
 
-    pub fn step(&self, graph: &mut Graph) {
+    pub fn step(&mut self, graph: &mut Graph) {
         let nodes = graph.nodes_mut();
         let mut forces = vec![Vec2::ZERO; nodes.len()];
 
@@ -39,18 +39,18 @@ impl ForceLayout {
         // }
 
         // attraction
-        for edge in graph.edges() {
-            if let (Some(i) , Some(j)) = {
-                graph.node_index(edge.source),
-                graph.node_index(edge.target),
-            } {
+        let edge_pairs: Vec<(u32, u32)> = graph.edges().iter().map(|e| (e.source, e.target)).collect();
+        for (source, target) in edge_pairs {
+            if let (Some(i), Some(j)) = (
+                graph.node_index(source),
+                graph.node_index(target),
+            ) {
                 let nodes = graph.nodes();
                 let pi = Vec2::new(nodes[i].x, nodes[i].y);
                 let pj = Vec2::new(nodes[j].x, nodes[j].y);
                 let delta = pj - pi;
                 let dist = delta.length().max(0.1);
                 let f = delta.normalize() * (dist * self.params.attraction);
-                let nodes = graph.nodes_mut();
 
                 forces[i] += f;
                 forces[j] -= f;

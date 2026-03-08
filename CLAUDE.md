@@ -58,7 +58,7 @@ All integers are little-endian.
 `ForceLayout::step()` runs one tick of the physics simulation: repulsion (all pairs, O(n²) initially), spring attraction (edges only), and gravity toward origin. Velocities are damped each step for convergence.
 
 `barnes_hut.rs` replaces the O(n²) repulsion loop with an O(n log n) quadtree approximation in Phase 5. Uses `AABB` from `crate::spatial`.
-`simd.rs` — WASM SIMD (`simd128`) paths for vectorized force calculations.
+`simd.rs` — Skipped. WASM SIMD paths were planned but not pursued.
 
 ### Render (`src/render/`)
 `backend.rs` detects the best available GPU tier at init (WebGPU → WebGL2+SIMD → WebGL2 → Canvas2D). The `wgpu` crate abstracts over WebGPU and WebGL2. Shaders are WGSL, included at compile time via `include_str!()` from `src/shaders/`.
@@ -89,10 +89,10 @@ pub fn do_thing_js(&self) -> Result<(), JsValue> {
 | `graph/mod.rs` | Complete — declares `types`, `spatial`, `algorithms`; re-exports `Node`, `Edge`, `Graph`, `Quadtree`, `AABB` |
 | `graph/spatial.rs` | Complete — `Quadtree` (insert, query_point, subdivide); imports `AABB` from `crate::spatial` |
 | `graph/algorithms.rs` | Partial — `pagerank` implemented; `louvain`, `shortest_path`, `betweenness_centrality` are stubs |
-| `layout/mod.rs` | Empty stub |
-| `layout/force.rs` | Empty stub |
+| `layout/mod.rs` | Partial — declares submodules, re-exports `ForceLayout`, `ForceParams` |
+| `layout/force.rs` | Partial — `ForceParams`, `ForceLayout::new`/`step` with attraction, gravity, integration; repulsion commented out (pending Barnes-Hut) |
 | `layout/barnes_hut.rs` | Empty stub |
-| `layout/simd.rs` | Empty stub |
+| `layout/simd.rs` | Skipped |
 | `render/mod.rs` | Partial — declares all submodules; no re-exports yet |
 | `render/camera.rs` | Complete — `Camera` struct with exponential smoothing, `focus_on`, `world_to_screen`, `screen_to_world` |
 | `render/backend.rs` | Empty stub |
