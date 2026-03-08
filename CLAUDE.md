@@ -82,7 +82,7 @@ pub fn do_thing_js(&self) -> Result<(), JsValue> {
 | `protocol/decode.rs` | Complete — full decoder including string table, node/edge data, and all primitive readers |
 | `protocol/mod.rs` | Complete — re-exports `Header`, `MAGIC`, `VERSION`, `Decoder` |
 | `graph/types.rs` | Complete — `Node`, `Edge`, `Graph` |
-| `graph/mod.rs` | Partial — declares `types`, `spatial`, `algorithms`; `spatial` re-export commented out |
+| `graph/mod.rs` | Complete — declares `types`, `spatial`, `algorithms`; re-exports `Node`, `Edge`, `Graph`, `Quadtree`, `AABB` |
 | `graph/spatial.rs` | Complete — `AABB` + `Quadtree` (insert, query_point, subdivide) |
 | `graph/algorithms.rs` | Partial — `pagerank` implemented; `louvain`, `shortest_path`, `betweenness_centrality` are stubs |
 | `layout/mod.rs` | Empty stub |
@@ -90,7 +90,7 @@ pub fn do_thing_js(&self) -> Result<(), JsValue> {
 | `layout/barnes_hut.rs` | Empty stub |
 | `layout/simd.rs` | Empty stub |
 | `render/mod.rs` | Partial — declares all submodules; no re-exports yet |
-| `render/camera.rs` | Empty stub |
+| `render/camera.rs` | Complete — `Camera` struct with exponential smoothing, `focus_on`, `world_to_screen`, `screen_to_world` |
 | `render/backend.rs` | Empty stub |
 | `render/nodes.rs` | Empty stub |
 | `render/edges.rs` | Empty stub |

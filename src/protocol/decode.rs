@@ -123,3 +123,146 @@ impl<'a> Decoder<'a> {
         Ok(slice)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::format::{Flags, HEADER_SIZE, MAGIC, VERSION};
+
+    fn build_blom(
+        nodes: &[(u32, f32, u16)],
+        edges: &[(u32, u32)],
+        labels: Option<&[&str]>,
+    ) -> Vec<u8> {
+        let flags = if labels.is_some() {
+            Flags::HasLabels as u16
+        } else {
+            0
+        };
+        let mut buf = Vec::new();
+
+        // Header
+        buf.extend_from_slice(&MAGIC.to_le_bytes());
+        buf.extend_from_slice(&VERSION.to_le_bytes());
+        buf.extend_from_slice(&(nodes.len() as u32).to_le_bytes());
+        buf.extend_from_slice(&(edges.len() as u32).to_le_bytes());
+        buf.extend_from_slice(&flags.to_le_bytes());
+        assert_eq!(buf.len(), HEADER_SIZE);
+
+        // String table (if labels present)
+        if let Some(labels) = labels {
+            let concat: Vec<u8> = labels.iter().flat_map(|s| s.as_bytes()).copied().collect();
+            let total_len = concat.len() as u32;
+            buf.extend_from_slice(&total_len.to_le_bytes());
+
+            let mut offset = 0u32;
+            for s in labels {
+                buf.extend_from_slice(&offset.to_le_bytes());
+                offset += s.len() as u32;
+            }
+            buf.extend_from_slice(&concat);
+        }
+
+        // Node data: ids, pageranks, degrees
+        for &(id, _, _) in nodes {
+            buf.extend_from_slice(&id.to_le_bytes());
+        }
+        for &(_, pr, _) in nodes {
+            buf.extend_from_slice(&pr.to_le_bytes());
+        }
+        for &(_, _, deg) in nodes {
+            buf.extend_from_slice(&deg.to_le_bytes());
+        }
+
+        // Edge data: sources, targets
+        for &(src, _) in edges {
+            buf.extend_from_slice(&src.to_le_bytes());
+        }
+        for &(_, tgt) in edges {
+            buf.extend_from_slice(&tgt.to_le_bytes());
+        }
+
+        buf
+    }
+
+    #[test]
+    fn decode_minimal_graph() {
+        let data = build_blom(&[], &[], None);
+        let graph = Decoder::new(&data).decode_graph().unwrap();
+        assert_eq!(graph.node_count(), 0);
+        assert_eq!(graph.edge_count(), 0);
+    }
+
+    #[test]
+    fn decode_nodes_no_labels() {
+        let nodes = &[(1, 0.5f32, 3u16), (2, 0.25, 1)];
+        let data = build_blom(nodes, &[], None);
+        let graph = Decoder::new(&data).decode_graph().unwrap();
+
+        assert_eq!(graph.node_count(), 2);
+        let n0 = &graph.nodes()[0];
+        assert_eq!(n0.id, 1);
+        assert_eq!(n0.pagerank, 0.5);
+        assert_eq!(n0.degree, 3);
+        assert!(n0.label.is_empty());
+        assert_eq!(n0.x, 0.0);
+        assert_eq!(n0.y, 0.0);
+
+        let n1 = &graph.nodes()[1];
+        assert_eq!(n1.id, 2);
+        assert_eq!(n1.pagerank, 0.25);
+        assert_eq!(n1.degree, 1);
+    }
+
+    #[test]
+    fn decode_edges() {
+        let nodes = &[(10, 0.0, 1), (20, 0.0, 1)];
+        let edges = &[(10u32, 20u32)];
+        let data = build_blom(nodes, edges, None);
+        let graph = Decoder::new(&data).decode_graph().unwrap();
+
+        assert_eq!(graph.edge_count(), 1);
+        assert_eq!(graph.edges()[0].source, 10);
+        assert_eq!(graph.edges()[0].target, 20);
+    }
+
+    #[test]
+    fn decode_with_labels() {
+        let nodes = &[(1, 0.1, 0), (2, 0.2, 0)];
+        let labels = &["hello", "world"];
+        let data = build_blom(nodes, &[], Some(labels));
+        let graph = Decoder::new(&data).decode_graph().unwrap();
+
+        assert_eq!(graph.nodes()[0].label, "hello");
+        assert_eq!(graph.nodes()[1].label, "world");
+    }
+
+    #[test]
+    fn decode_truncated_data() {
+        let mut data = build_blom(&[(1, 0.0, 0)], &[], None);
+        data.truncate(HEADER_SIZE + 2); // cut off mid-node-data
+        let err = Decoder::new(&data).decode_graph().unwrap_err();
+        assert!(err.contains("Unexpected EOF"), "got: {err}");
+    }
+
+    #[test]
+    fn decode_roundtrip_counts() {
+        let nodes = &[(1, 0.1, 2), (2, 0.2, 3), (3, 0.3, 1)];
+        let edges = &[(1, 2), (2, 3)];
+        let data = build_blom(nodes, edges, None);
+        let graph = Decoder::new(&data).decode_graph().unwrap();
+        assert_eq!(graph.node_count(), 3);
+        assert_eq!(graph.edge_count(), 2);
+    }
+
+    #[test]
+    fn decode_node_index_lookup() {
+        let nodes = &[(42, 0.0, 0), (99, 0.0, 0)];
+        let data = build_blom(nodes, &[], None);
+        let graph = Decoder::new(&data).decode_graph().unwrap();
+
+        assert_eq!(graph.node_by_id(42).unwrap().id, 42);
+        assert_eq!(graph.node_by_id(99).unwrap().id, 99);
+        assert!(graph.node_by_id(1).is_none());
+    }
+}
