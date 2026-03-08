@@ -7,6 +7,12 @@ pub struct Camera {
     target_zoom: f32,
 }
 
+impl Default for Camera {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Camera {
     pub fn new() -> Self {
         Self {
