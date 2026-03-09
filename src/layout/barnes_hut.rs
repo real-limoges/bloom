@@ -1,9 +1,12 @@
-use glam::Vec2;
 use crate::spatial::AABB;
+use glam::Vec2;
 
 enum QuadNode {
     Empty,
-    Leaf { pos: Vec2, mass: f32 },
+    Leaf {
+        pos: Vec2,
+        mass: f32,
+    },
     Internal {
         center_of_mass: Vec2,
         total_mass: f32,
@@ -18,8 +21,16 @@ impl QuadNode {
             QuadNode::Empty => {
                 *self = QuadNode::Leaf { pos, mass };
             }
-            QuadNode::Leaf { pos: existing_pos, mass: existing_mass } => {}
-            QuadNode::Internal { center_of_mass, total_mass, bounds: node_bounds, children } => {}
+            QuadNode::Leaf {
+                pos: existing_pos,
+                mass: existing_mass,
+            } => {}
+            QuadNode::Internal {
+                center_of_mass,
+                total_mass,
+                bounds: node_bounds,
+                children,
+            } => {}
         }
     }
 }

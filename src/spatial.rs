@@ -39,10 +39,30 @@ impl AABB {
     pub fn subdivide(&self) -> [AABB; 4] {
         let (cx, cy) = self.center();
         [
-            AABB { min_x: self.min_x, min_y: self.min_y, max_x: cx,         max_y: cy },
-            AABB { min_x: cx,         min_y: self.min_y, max_x: self.max_x, max_y: cy },
-            AABB { min_x: self.min_x, min_y: cy,         max_x: cx,         max_y: self.max_y },
-            AABB { min_x: cx,         min_y: cy,         max_x: self.max_x, max_y: self.max_y },
+            AABB {
+                min_x: self.min_x,
+                min_y: self.min_y,
+                max_x: cx,
+                max_y: cy,
+            },
+            AABB {
+                min_x: cx,
+                min_y: self.min_y,
+                max_x: self.max_x,
+                max_y: cy,
+            },
+            AABB {
+                min_x: self.min_x,
+                min_y: cy,
+                max_x: cx,
+                max_y: self.max_y,
+            },
+            AABB {
+                min_x: cx,
+                min_y: cy,
+                max_x: self.max_x,
+                max_y: self.max_y,
+            },
         ]
     }
 }

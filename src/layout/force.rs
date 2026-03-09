@@ -10,18 +10,26 @@ pub struct ForceParams {
 
 impl Default for ForceParams {
     fn default() -> Self {
-        Self { attraction: 0.1, repulsion: 100.0, gravity: 0.01, damping: 0.9 }
+        Self {
+            attraction: 0.1,
+            repulsion: 100.0,
+            gravity: 0.01,
+            damping: 0.9,
+        }
     }
 }
 
 pub struct ForceLayout {
     pub params: ForceParams,
-    velocities: Vec<Vec2>
+    velocities: Vec<Vec2>,
 }
 
 impl ForceLayout {
     pub fn new(node_count: usize, params: ForceParams) -> Self {
-        Self { params, velocities: vec![Vec2::ZERO; node_count] }
+        Self {
+            params,
+            velocities: vec![Vec2::ZERO; node_count],
+        }
     }
 
     pub fn step(&mut self, graph: &mut Graph) {
@@ -39,12 +47,10 @@ impl ForceLayout {
         // }
 
         // attraction
-        let edge_pairs: Vec<(u32, u32)> = graph.edges().iter().map(|e| (e.source, e.target)).collect();
+        let edge_pairs: Vec<(u32, u32)> =
+            graph.edges().iter().map(|e| (e.source, e.target)).collect();
         for (source, target) in edge_pairs {
-            if let (Some(i), Some(j)) = (
-                graph.node_index(source),
-                graph.node_index(target),
-            ) {
+            if let (Some(i), Some(j)) = (graph.node_index(source), graph.node_index(target)) {
                 let nodes = graph.nodes();
                 let pi = Vec2::new(nodes[i].x, nodes[i].y);
                 let pj = Vec2::new(nodes[j].x, nodes[j].y);
