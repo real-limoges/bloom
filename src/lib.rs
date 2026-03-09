@@ -5,6 +5,7 @@ pub mod graph;
 pub mod layout;
 pub mod protocol;
 pub mod render;
+pub mod spatial;
 
 #[wasm_bindgen]
 pub struct BloomEngine {
