@@ -1,6 +1,7 @@
 use crate::spatial::AABB;
 use glam::Vec2;
 
+#[allow(dead_code)]
 enum QuadNode {
     Empty,
     Leaf {
@@ -16,20 +17,21 @@ enum QuadNode {
 }
 
 impl QuadNode {
-    fn insert(&mut self, pos: Vec2, mass: f32, bounds: &AABB) {
+    #[allow(dead_code)]
+    fn insert(&mut self, pos: Vec2, mass: f32, _bounds: &AABB) {
         match self {
             QuadNode::Empty => {
                 *self = QuadNode::Leaf { pos, mass };
             }
             QuadNode::Leaf {
-                pos: existing_pos,
-                mass: existing_mass,
+                pos: _existing_pos,
+                mass: _existing_mass,
             } => {}
             QuadNode::Internal {
-                center_of_mass,
-                total_mass,
-                bounds: node_bounds,
-                children,
+                center_of_mass: _,
+                total_mass: _,
+                bounds: _node_bounds,
+                children: _,
             } => {}
         }
     }
