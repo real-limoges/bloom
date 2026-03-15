@@ -70,7 +70,8 @@ impl QuadNode {
                 total_mass,
                 children,
             } => {
-                *center_of_mass = (*center_of_mass * *total_mass + pos * mass) / (*total_mass + mass);
+                *center_of_mass =
+                    (*center_of_mass * *total_mass + pos * mass) / (*total_mass + mass);
                 *total_mass += mass;
 
                 let sub_bounds = bounds.subdivide();

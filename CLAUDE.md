@@ -89,9 +89,9 @@ pub fn do_thing_js(&self) -> Result<(), JsValue> {
 | `graph/mod.rs` | Complete — declares `types`, `spatial`, `algorithms`; re-exports `Node`, `Edge`, `Graph`, `Quadtree`, `AABB` |
 | `graph/spatial.rs` | Complete — `Quadtree` (insert, query_point, subdivide); imports `AABB` from `crate::spatial` |
 | `graph/algorithms.rs` | Partial — `pagerank` implemented; `louvain`, `shortest_path`, `betweenness_centrality` are stubs |
-| `layout/mod.rs` | Partial — declares submodules, re-exports `ForceLayout`, `ForceParams` |
-| `layout/force.rs` | Partial — `ForceParams`, `ForceLayout::new`/`step` with attraction, gravity, integration; repulsion commented out (pending Barnes-Hut) |
-| `layout/barnes_hut.rs` | Empty stub |
+| `layout/mod.rs` | Complete — re-exports `ForceLayout`, `ForceParams`, `BarnesHutTree` |
+| `layout/force.rs` | Complete — `ForceParams` (with `theta`), `ForceLayout::new`/`step` with Barnes-Hut repulsion, attraction, gravity, damping |
+| `layout/barnes_hut.rs` | Complete — `QuadNode` insert/subdivide, `compute_force` with θ approximation, `BarnesHutTree` wrapper |
 | `layout/simd.rs` | Skipped |
 | `render/mod.rs` | Partial — declares all submodules; no re-exports yet |
 | `render/camera.rs` | Complete — `Camera` struct with exponential smoothing, `focus_on`, `world_to_screen`, `screen_to_world` |
