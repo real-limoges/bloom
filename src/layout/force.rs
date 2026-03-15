@@ -1,4 +1,5 @@
 use crate::graph::Graph;
+use crate::layout::barnes_hut::BarnesHutTree;
 use glam::Vec2;
 
 pub struct ForceParams {
@@ -6,6 +7,7 @@ pub struct ForceParams {
     pub repulsion: f32,
     pub gravity: f32,
     pub damping: f32,
+    pub theta: f32,
 }
 
 impl Default for ForceParams {
@@ -15,6 +17,7 @@ impl Default for ForceParams {
             repulsion: 100.0,
             gravity: 0.01,
             damping: 0.9,
+            theta: 0.7,
         }
     }
 }
@@ -36,15 +39,11 @@ impl ForceLayout {
         let nodes = graph.nodes_mut();
         let mut forces = vec![Vec2::ZERO; nodes.len()];
 
-        // repulsion
-        // for i in 0..nodes.len() {
-        //     for j in i + 1..nodes.len() {
-        //         let pi = Vec2::new(nodes[i].x, nodes[i].y);
-        //         let pj = Vec2::new(nodes[j].x, nodes[j].y);
-        //         let delta = pi -pj;
-        //
-        //     }
-        // }
+        // repulsion via Barnes-Hut
+        let tree = BarnesHutTree::build(nodes);
+        for i in 0..nodes.len() {
+            forces[i] += tree.compute_repulsion(i, nodes, self.params.repulsion, self.params.theta);
+        }
 
         // attraction
         let edge_pairs: Vec<(u32, u32)> =
@@ -74,5 +73,60 @@ impl ForceLayout {
             node.x += self.velocities[i].x;
             node.y += self.velocities[i].y;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::graph::{Edge, Node};
+
+    fn make_node(id: u32) -> Node {
+        Node {
+            id,
+            label: String::new(),
+            pagerank: 0.0,
+            degree: 0,
+            x: 0.0,
+            y: 0.0,
+        }
+    }
+
+    #[test]
+    fn layout_spreads_nodes() {
+        let nodes: Vec<Node> = (0..5)
+            .map(|i| {
+                let mut n = make_node(i);
+                // Small distinct offsets so forces aren't degenerate
+                n.x = (i as f32) * 0.1;
+                n.y = (i as f32) * 0.07;
+                n
+            })
+            .collect();
+        let edges = vec![
+            Edge { source: 0, target: 1 },
+            Edge { source: 1, target: 2 },
+            Edge { source: 2, target: 3 },
+            Edge { source: 3, target: 4 },
+        ];
+        let mut graph = Graph::new(nodes, edges);
+        let mut layout = ForceLayout::new(5, ForceParams::default());
+
+        for _ in 0..50 {
+            layout.step(&mut graph);
+        }
+
+        let avg_dist: f32 = graph
+            .nodes()
+            .iter()
+            .map(|n| (n.x * n.x + n.y * n.y).sqrt())
+            .sum::<f32>()
+            / graph.node_count() as f32;
+
+        assert!(
+            avg_dist > 1.0,
+            "Nodes should have spread apart, avg distance from origin: {}",
+            avg_dist
+        );
     }
 }
