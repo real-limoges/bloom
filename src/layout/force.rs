@@ -41,8 +41,8 @@ impl ForceLayout {
 
         // repulsion via Barnes-Hut
         let tree = BarnesHutTree::build(nodes);
-        for i in 0..nodes.len() {
-            forces[i] += tree.compute_repulsion(i, nodes, self.params.repulsion, self.params.theta);
+        for (i, force) in forces.iter_mut().enumerate() {
+            *force += tree.compute_repulsion(i, nodes, self.params.repulsion, self.params.theta);
         }
 
         // attraction
@@ -104,10 +104,22 @@ mod tests {
             })
             .collect();
         let edges = vec![
-            Edge { source: 0, target: 1 },
-            Edge { source: 1, target: 2 },
-            Edge { source: 2, target: 3 },
-            Edge { source: 3, target: 4 },
+            Edge {
+                source: 0,
+                target: 1,
+            },
+            Edge {
+                source: 1,
+                target: 2,
+            },
+            Edge {
+                source: 2,
+                target: 3,
+            },
+            Edge {
+                source: 3,
+                target: 4,
+            },
         ];
         let mut graph = Graph::new(nodes, edges);
         let mut layout = ForceLayout::new(5, ForceParams::default());

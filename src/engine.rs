@@ -1,4 +1,4 @@
-use crate::graph::{Graph, Node, Quadtree, AABB};
+use crate::graph::{AABB, Graph, Node, Quadtree};
 use crate::layout::{ForceLayout, ForceParams};
 use crate::protocol::decode::Decoder;
 use crate::render::camera::Camera;
@@ -98,10 +98,10 @@ impl BloomEngine {
     }
 
     pub fn focus_node(&mut self, node_id: u32) {
-        if let Some(graph) = &self.graph {
-            if let Some(node) = graph.node_by_id(node_id) {
-                self.camera.focus_on(node.x, node.y, 2.0);
-            }
+        if let Some(graph) = &self.graph
+            && let Some(node) = graph.node_by_id(node_id)
+        {
+            self.camera.focus_on(node.x, node.y, 2.0);
         }
     }
 
