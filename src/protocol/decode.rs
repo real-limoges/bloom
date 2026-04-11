@@ -50,25 +50,27 @@ impl<'a> Decoder<'a> {
 
     fn decode_string_table(&mut self, count: usize) -> Result<Vec<String>, String> {
         let total_len = self.read_u32()? as usize;
-        let offsets: Vec<u32> = (0..count)
-            .map(|_| self.read_u32())
+        let offsets: Vec<usize> = (0..count)
+            .map(|_| self.read_u32().map(|v| v as usize))
             .collect::<Result<_, _>>()?;
-
         let string_data = self.read_bytes(total_len)?;
 
-        let mut labels = Vec::with_capacity(count);
-        for i in 0..count {
-            let start = offsets[i] as usize;
-            let end = if i + 1 < count {
-                offsets[i + 1] as usize
-            } else {
-                total_len
-            };
-            let s = std::str::from_utf8(&string_data[start..end])
-                .map_err(|e| format!("Invalid UTF-8: {}", e))?;
-            labels.push(s.to_string());
-        }
-        Ok(labels)
+        offsets
+            .iter()
+            .copied()
+            .zip(
+                offsets
+                    .iter()
+                    .skip(1)
+                    .copied()
+                    .chain(std::iter::once(total_len)),
+            )
+            .map(|(start, end)| {
+                std::str::from_utf8(&string_data[start..end])
+                    .map(|s| s.to_string())
+                    .map_err(|e| format!("Invalid UTF-8: {e}"))
+            })
+            .collect()
     }
 
     #[allow(clippy::type_complexity)]
@@ -85,7 +87,7 @@ impl<'a> Decoder<'a> {
         Ok((sources, targets))
     }
 
-    // primatives
+    // primitives
 
     fn read_u32_array(&mut self, count: usize) -> Result<Vec<u32>, String> {
         (0..count).map(|_| self.read_u32()).collect()

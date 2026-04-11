@@ -49,33 +49,44 @@ All integers are little-endian.
 `Graph` stores nodes as `Vec<Node>` and edges as `Vec<Edge>` (edge list, not adjacency matrix). An `id_to_index: HashMap<u32, usize>` provides O(1) lookup from external database ID to array index. Node `(x, y)` fields start at `0.0` and are written by the layout engine each frame.
 
 `spatial.rs` — quadtree for O(log n) mouse hit-testing. Imports `AABB` from `crate::spatial`.
-`algorithms.rs` — PageRank, Louvain, shortest path, betweenness (stub, implement in Phase 5).
+`algorithms.rs` — PageRank (implemented), Louvain, shortest path, betweenness centrality (stubs).
 
 ### Shared Primitives (`src/spatial.rs`)
-`AABB` (axis-aligned bounding box) lives here as a shared geometry primitive. Both the hit-testing quadtree (`graph/spatial.rs`) and the Barnes-Hut tree (`layout/barnes_hut.rs`) import it from this module.
+`AABB` (axis-aligned bounding box) lives here as a shared geometry primitive. Both the hit-testing quadtree (`graph/spatial.rs`) and the Barnes-Hut tree (`layout/barnes_hut.rs`) import it from this module. `AABB::enclosing()` computes a tight bounding box from an iterator of points; `padded()` expands it proportionally.
 
 ### Layout (`src/layout/`)
-`ForceLayout::step()` runs one tick of the physics simulation: repulsion (all pairs, O(n²) initially), spring attraction (edges only), and gravity toward origin. Velocities are damped each step for convergence.
+`ForceLayout::step()` runs one tick of the physics simulation: Barnes-Hut repulsion (O(n log n), θ=0.7), spring attraction (edges only), and gravity toward origin. Velocities are damped each step for convergence.
 
-`barnes_hut.rs` replaces the O(n²) repulsion loop with an O(n log n) quadtree approximation in Phase 5. Uses `AABB` from `crate::spatial`.
-`simd.rs` — Skipped. WASM SIMD paths were planned but not pursued.
+`barnes_hut.rs` implements the Barnes-Hut tree used by `force.rs` for O(n log n) repulsion. Uses `AABB` from `crate::spatial`.
 
 ### Render (`src/render/`)
-`backend.rs` detects the best available GPU tier at init (WebGPU → WebGL2+SIMD → WebGL2 → Canvas2D). The `wgpu` crate abstracts over WebGPU and WebGL2. Shaders are WGSL, included at compile time via `include_str!()` from `src/shaders/`.
+GPU-accelerated rendering via `wgpu`.
 
-Nodes are rendered with instanced drawing (one draw call for all nodes). Each node is a quad; the fragment shader applies a circle SDF for antialiased edges. Text uses an SDF font atlas (`assets/fonts/inter-sdf.png`).
+`camera.rs` — `Camera` struct with exponential smoothing for pan/zoom, `world_to_screen`/`screen_to_world` coordinate transforms, `view_projection_matrix` for GPU uniform upload, and `focus_on` for snapping to a node.
+
+`backend.rs` — `RenderBackend` wraps wgpu device/queue/surface. Async `new(canvas)` handles GPU initialization with WebGPU → WebGL2 fallback. Provides `begin_frame`/`end_frame` for the render loop.
+
+`nodes.rs` — `NodeRenderer` uses instanced drawing: a unit quad with per-node instance data (`GpuNode`: position, size, color). Circle SDF fragment shader (`src/shaders/node.wgsl`) produces antialiased circles. Node size scales with PageRank.
+
+`edges.rs` — `EdgeRenderer` draws edges as 1px lines (`PrimitiveTopology::LineList`). Each edge becomes two `GpuEdgeVertex` entries (source/target positions) built functionally via `filter_map`/`flatten`.
+
+`text.rs` — `TextRenderer` renders node labels using SDF text. At init, rasterizes Inter font glyphs via `fontdue`, computes signed distance fields (Felzenszwalb EDT), and packs into a 1024x1024 `R8Unorm` atlas texture. Renders glyphs as instanced quads with adaptive `fwidth()`-based smoothing (`src/shaders/text.wgsl`). LOD culling skips labels when nodes are < 8px on screen.
+
+Shaders are WGSL, included at compile time via `include_str!()` from `src/shaders/`.
 
 ### Entry Point (`src/lib.rs`)
-`#[wasm_bindgen] BloomEngine` is the public JS API. It wraps `engine::BloomEngine` (the internal state machine). All internal errors use `Result<T, String>`; these are converted to `JsValue` only at the `#[wasm_bindgen]` boundary:
+`#[wasm_bindgen] BloomEngine` is the public JS API. It wraps `engine::BloomEngine` (the internal state machine). All internal errors use `Result<T, String>`; these are converted to `JsValue` only at the `#[wasm_bindgen]` boundary.
 
-```rust
-pub fn do_thing(&self) -> Result<(), String> { ... }
-
-#[wasm_bindgen]
-pub fn do_thing_js(&self) -> Result<(), JsValue> {
-    self.do_thing().map_err(|e| JsValue::from_str(&e))
-}
+JS usage:
+```js
+const engine = new BloomEngine(canvas);
+await engine.init_renderer(canvas);  // async GPU init
+engine.load_graph(binaryData);
+// animation loop:
+engine.tick(dt);
 ```
+
+`init_renderer` is async because `wgpu` adapter/device requests return Promises. The engine works without it (layout-only mode) — `tick()` skips rendering when no backend is present.
 
 ## Current Implementation State
 
@@ -85,22 +96,25 @@ pub fn do_thing_js(&self) -> Result<(), JsValue> {
 | `protocol/decode.rs` | Complete — full decoder including string table, node/edge data, and all primitive readers |
 | `protocol/mod.rs` | Complete — re-exports `Header`, `MAGIC`, `VERSION`, `Decoder` |
 | `graph/types.rs` | Complete — `Node`, `Edge`, `Graph` |
-| `spatial.rs` | Complete — shared `AABB` primitive (contains, intersects_circle, subdivide) |
+| `spatial.rs` | Complete — shared `AABB` primitive (contains, intersects_circle, subdivide, enclosing, padded) |
 | `graph/mod.rs` | Complete — declares `types`, `spatial`, `algorithms`; re-exports `Node`, `Edge`, `Graph`, `Quadtree`, `AABB` |
 | `graph/spatial.rs` | Complete — `Quadtree` (insert, query_point, subdivide); imports `AABB` from `crate::spatial` |
 | `graph/algorithms.rs` | Partial — `pagerank` implemented; `louvain`, `shortest_path`, `betweenness_centrality` are stubs |
 | `layout/mod.rs` | Complete — re-exports `ForceLayout`, `ForceParams`, `BarnesHutTree` |
 | `layout/force.rs` | Complete — `ForceParams` (with `theta`), `ForceLayout::new`/`step` with Barnes-Hut repulsion, attraction, gravity, damping |
 | `layout/barnes_hut.rs` | Complete — `QuadNode` insert/subdivide, `compute_force` with θ approximation, `BarnesHutTree` wrapper |
-| `layout/simd.rs` | Skipped |
-| `render/mod.rs` | Partial — declares all submodules; no re-exports yet |
-| `render/camera.rs` | Complete — `Camera` struct with exponential smoothing, `focus_on`, `world_to_screen`, `screen_to_world` |
-| `render/backend.rs` | Empty stub |
-| `render/nodes.rs` | Empty stub |
-| `render/edges.rs` | Empty stub |
-| `render/text.rs` | Empty stub |
-| `engine.rs` | Empty stub |
-| `lib.rs` | Minimal scaffold — `BloomEngine` has no fields yet |
+| `render/mod.rs` | Complete — re-exports `backend`, `camera`, `nodes`, `edges`, `text` |
+| `render/camera.rs` | Complete — `Camera` with smoothing, `focus_on`, `world_to_screen`, `screen_to_world`, `view_projection_matrix` |
+| `render/backend.rs` | Complete — `RenderBackend` async GPU init (WebGPU/WebGL2), surface management, frame lifecycle |
+| `render/nodes.rs` | Complete — `NodeRenderer` instanced quad rendering with `GpuNode`, pipeline, buffer management |
+| `render/edges.rs` | Complete — `EdgeRenderer` line-list rendering with `GpuEdgeVertex`, pipeline, buffer management |
+| `render/text.rs` | Complete — `TextRenderer` SDF text rendering with fontdue rasterization, Felzenszwalb EDT, atlas packing, instanced glyph quads, LOD culling; 5 tests |
+| `shaders/node.wgsl` | Complete — circle SDF vertex/fragment shader with instancing and view-projection uniform |
+| `shaders/edge.wgsl` | Complete — simple line vertex/fragment shader with view-projection uniform |
+| `shaders/text.wgsl` | Complete — SDF text vertex/fragment shader with atlas sampling and `fwidth()` adaptive smoothing |
+| `test_utils.rs` | Complete — `build_blom()` helper for constructing BLOM binary test data |
+| `engine.rs` | Complete — owns `Graph`, `ForceLayout`, `Camera`, `Quadtree`, optional `RenderBackend`/`NodeRenderer`/`EdgeRenderer`/`TextRenderer`; `load_graph`, `tick` (layout + render), `resize`, `node_at`, `focus_node`, async `init_renderer`; 4 tests |
+| `lib.rs` | Complete — `#[wasm_bindgen]` wrapper; exposes `load_graph`, `tick`, `resize`, `hover`, `focus_node`, async `init_renderer` to JS |
 
 The implementation guide at `docs/IMPLEMENTATION_GUIDE.md` tracks the phased build plan. `docs/THEORY.md` explains the concepts behind each component.
 

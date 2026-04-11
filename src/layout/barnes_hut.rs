@@ -110,13 +110,14 @@ impl QuadNode {
                     let dist = dist.max(MIN_DIST);
                     delta.normalize() * (repulsion * *total_mass / (dist * dist))
                 } else {
-                    // Recurse into children
                     let sub_bounds = bounds.subdivide();
-                    let mut force = Vec2::ZERO;
-                    for (i, child) in children.iter().enumerate() {
-                        force += child.compute_force(pos, theta, repulsion, &sub_bounds[i]);
-                    }
-                    force
+                    children
+                        .iter()
+                        .enumerate()
+                        .map(|(i, child)| {
+                            child.compute_force(pos, theta, repulsion, &sub_bounds[i])
+                        })
+                        .sum()
                 }
             }
         }
@@ -140,41 +141,15 @@ pub struct BarnesHutTree {
 
 impl BarnesHutTree {
     pub fn build(nodes: &[Node]) -> Self {
-        if nodes.is_empty() {
-            return Self {
-                root: QuadNode::Empty,
-                bounds: AABB {
-                    min_x: -1.0,
-                    min_y: -1.0,
-                    max_x: 1.0,
-                    max_y: 1.0,
-                },
-            };
-        }
-
-        let mut min_x = f32::MAX;
-        let mut min_y = f32::MAX;
-        let mut max_x = f32::MIN;
-        let mut max_y = f32::MIN;
-
-        for n in nodes {
-            min_x = min_x.min(n.x);
-            min_y = min_y.min(n.y);
-            max_x = max_x.max(n.x);
-            max_y = max_y.max(n.y);
-        }
-
-        // 5% padding + minimum size
-        let w = (max_x - min_x).max(1.0);
-        let h = (max_y - min_y).max(1.0);
-        let pad_x = w * 0.05;
-        let pad_y = h * 0.05;
-        let bounds = AABB {
-            min_x: min_x - pad_x,
-            min_y: min_y - pad_y,
-            max_x: max_x + pad_x,
-            max_y: max_y + pad_y,
+        let default_bounds = AABB {
+            min_x: -1.0,
+            min_y: -1.0,
+            max_x: 1.0,
+            max_y: 1.0,
         };
+        let bounds = AABB::enclosing(nodes.iter().map(|n| (n.x, n.y)))
+            .map(|b| b.padded(0.05))
+            .unwrap_or(default_bounds);
 
         let mut root = QuadNode::Empty;
         for n in nodes {

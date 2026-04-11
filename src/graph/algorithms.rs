@@ -150,7 +150,7 @@ mod tests {
         let max_idx = scores
             .iter()
             .enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap()
             .0;
         assert_eq!(max_idx, 0, "hub node should rank highest");

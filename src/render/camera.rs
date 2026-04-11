@@ -1,3 +1,5 @@
+use glam::Mat4;
+
 pub struct Camera {
     pub x: f32,
     pub y: f32,
@@ -48,6 +50,21 @@ impl Camera {
         let wx = (sx as f32 - canvas_w as f32 / 2.0) / self.zoom + self.x;
         let wy = (sy as f32 - canvas_h as f32 / 2.0) / self.zoom + self.y;
         (wx, wy)
+    }
+
+    pub fn view_projection_matrix(&self, canvas_w: f32, canvas_h: f32) -> Mat4 {
+        let half_w = canvas_w / (2.0 * self.zoom);
+        let half_h = canvas_h / (2.0 * self.zoom);
+
+        // bottom > top so that positive y goes downward (matching world_to_screen)
+        Mat4::orthographic_rh(
+            self.x - half_w,
+            self.x + half_w,
+            self.y + half_h,
+            self.y - half_h,
+            -1.0,
+            1.0,
+        )
     }
 }
 
@@ -116,6 +133,29 @@ mod tests {
         assert!((c.x - 50.0).abs() < 1e-2);
         assert!((c.y - -30.0).abs() < 1e-2);
         assert!((c.zoom - 2.0).abs() < 1e-2);
+    }
+
+    #[test]
+    fn view_proj_origin_maps_to_clip_origin() {
+        let c = Camera::new();
+        let vp = c.view_projection_matrix(800.0, 600.0);
+        let clip = vp * glam::Vec4::new(0.0, 0.0, 0.0, 1.0);
+        assert!((clip.x / clip.w).abs() < 1e-4);
+        assert!((clip.y / clip.w).abs() < 1e-4);
+    }
+
+    #[test]
+    fn view_proj_zoom_halves_visible_area() {
+        let mut c = Camera::new();
+        let vp1 = c.view_projection_matrix(800.0, 600.0);
+        let clip1 = vp1 * glam::Vec4::new(100.0, 0.0, 0.0, 1.0);
+
+        c.zoom = 2.0;
+        let vp2 = c.view_projection_matrix(800.0, 600.0);
+        let clip2 = vp2 * glam::Vec4::new(100.0, 0.0, 0.0, 1.0);
+
+        // At 2x zoom, the same world point should be further in clip space
+        assert!((clip2.x / clip2.w).abs() > (clip1.x / clip1.w).abs());
     }
 
     #[test]

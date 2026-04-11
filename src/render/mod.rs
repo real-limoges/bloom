@@ -1,5 +1,5 @@
-mod backend;
+pub mod backend;
 pub mod camera;
-mod edges;
-mod nodes;
-mod text;
+pub mod edges;
+pub mod nodes;
+pub mod text;
