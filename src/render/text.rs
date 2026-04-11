@@ -286,7 +286,7 @@ impl TextRenderer {
             .iter()
             .filter(|n| {
                 let node_size = 3.0 + n.pagerank * 20.0;
-                let screen_radius = node_size * camera.zoom as f32;
+                let screen_radius = node_size * camera.zoom;
                 screen_radius >= 8.0 && !n.label.is_empty()
             })
             .flat_map(|n| {
@@ -523,13 +523,13 @@ fn edt_1d(f: &mut [f32], d: &mut [f32], z: &mut [f32], v: &mut [usize], n: usize
     }
 
     k = 0;
-    for q in 0..n {
+    for (q, d_q) in d.iter_mut().enumerate().take(n) {
         while z[k + 1] < q as f32 {
             k += 1;
         }
         let vk = v[k];
         let dq = q as f32 - vk as f32;
-        d[q] = dq * dq + f[vk];
+        *d_q = dq * dq + f[vk];
     }
 }
 
