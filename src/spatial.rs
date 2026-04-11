@@ -40,7 +40,12 @@ impl AABB {
     pub fn enclosing(points: impl Iterator<Item = (f32, f32)>) -> Option<Self> {
         points.fold(None, |acc, (x, y)| {
             Some(match acc {
-                None => AABB { min_x: x, min_y: y, max_x: x, max_y: y },
+                None => AABB {
+                    min_x: x,
+                    min_y: y,
+                    max_x: x,
+                    max_y: y,
+                },
                 Some(b) => AABB {
                     min_x: b.min_x.min(x),
                     min_y: b.min_y.min(y),

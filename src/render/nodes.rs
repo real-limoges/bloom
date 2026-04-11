@@ -30,12 +30,7 @@ impl NodeRenderer {
         });
 
         // Unit quad: 4 vertices
-        let quad_vertices: [[f32; 2]; 4] = [
-            [-1.0, -1.0],
-            [1.0, -1.0],
-            [1.0, 1.0],
-            [-1.0, 1.0],
-        ];
+        let quad_vertices: [[f32; 2]; 4] = [[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0]];
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("node_quad_vertices"),
             contents: bytemuck::cast_slice(&quad_vertices),

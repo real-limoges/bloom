@@ -72,7 +72,14 @@ impl RenderBackend {
 
     pub fn begin_frame(
         &self,
-    ) -> Result<(wgpu::SurfaceTexture, wgpu::TextureView, wgpu::CommandEncoder), String> {
+    ) -> Result<
+        (
+            wgpu::SurfaceTexture,
+            wgpu::TextureView,
+            wgpu::CommandEncoder,
+        ),
+        String,
+    > {
         let frame = self
             .surface
             .get_current_texture()

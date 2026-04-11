@@ -55,8 +55,16 @@ impl<'a> Decoder<'a> {
             .collect::<Result<_, _>>()?;
         let string_data = self.read_bytes(total_len)?;
 
-        offsets.iter().copied()
-            .zip(offsets.iter().skip(1).copied().chain(std::iter::once(total_len)))
+        offsets
+            .iter()
+            .copied()
+            .zip(
+                offsets
+                    .iter()
+                    .skip(1)
+                    .copied()
+                    .chain(std::iter::once(total_len)),
+            )
             .map(|(start, end)| {
                 std::str::from_utf8(&string_data[start..end])
                     .map(|s| s.to_string())

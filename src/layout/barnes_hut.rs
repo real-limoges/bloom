@@ -111,8 +111,12 @@ impl QuadNode {
                     delta.normalize() * (repulsion * *total_mass / (dist * dist))
                 } else {
                     let sub_bounds = bounds.subdivide();
-                    children.iter().enumerate()
-                        .map(|(i, child)| child.compute_force(pos, theta, repulsion, &sub_bounds[i]))
+                    children
+                        .iter()
+                        .enumerate()
+                        .map(|(i, child)| {
+                            child.compute_force(pos, theta, repulsion, &sub_bounds[i])
+                        })
                         .sum()
                 }
             }
@@ -137,7 +141,12 @@ pub struct BarnesHutTree {
 
 impl BarnesHutTree {
     pub fn build(nodes: &[Node]) -> Self {
-        let default_bounds = AABB { min_x: -1.0, min_y: -1.0, max_x: 1.0, max_y: 1.0 };
+        let default_bounds = AABB {
+            min_x: -1.0,
+            min_y: -1.0,
+            max_x: 1.0,
+            max_y: 1.0,
+        };
         let bounds = AABB::enclosing(nodes.iter().map(|n| (n.x, n.y)))
             .map(|b| b.padded(0.05))
             .unwrap_or(default_bounds);

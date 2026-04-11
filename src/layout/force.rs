@@ -47,7 +47,9 @@ impl ForceLayout {
 
         // attraction (iterate edges directly — all borrows are immutable)
         for edge in graph.edges() {
-            if let (Some(i), Some(j)) = (graph.node_index(edge.source), graph.node_index(edge.target)) {
+            if let (Some(i), Some(j)) =
+                (graph.node_index(edge.source), graph.node_index(edge.target))
+            {
                 let nodes = graph.nodes();
                 let delta = Vec2::new(nodes[j].x - nodes[i].x, nodes[j].y - nodes[i].y);
                 let f = delta.normalize() * (delta.length().max(0.1) * self.params.attraction);

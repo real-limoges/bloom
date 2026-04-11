@@ -144,13 +144,21 @@ impl EdgeRenderer {
     ) {
         let edge_color = [0.5, 0.5, 0.5, 0.3];
         let nodes = graph.nodes();
-        let vertices: Vec<GpuEdgeVertex> = graph.edges().iter()
+        let vertices: Vec<GpuEdgeVertex> = graph
+            .edges()
+            .iter()
             .filter_map(|edge| {
                 let src = &nodes[graph.node_index(edge.source)?];
                 let tgt = &nodes[graph.node_index(edge.target)?];
                 Some([
-                    GpuEdgeVertex { position: [src.x, src.y], color: edge_color },
-                    GpuEdgeVertex { position: [tgt.x, tgt.y], color: edge_color },
+                    GpuEdgeVertex {
+                        position: [src.x, src.y],
+                        color: edge_color,
+                    },
+                    GpuEdgeVertex {
+                        position: [tgt.x, tgt.y],
+                        color: edge_color,
+                    },
                 ])
             })
             .flatten()
@@ -160,12 +168,11 @@ impl EdgeRenderer {
         if count > 0 {
             let data = bytemuck::cast_slice(&vertices);
             if count != self.vertex_count {
-                self.vertex_buffer =
-                    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("edge_vertices"),
-                        contents: data,
-                        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                    });
+                self.vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("edge_vertices"),
+                    contents: data,
+                    usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+                });
             } else {
                 queue.write_buffer(&self.vertex_buffer, 0, data);
             }

@@ -46,11 +46,7 @@ pub struct TextRenderer {
 }
 
 impl TextRenderer {
-    pub fn new(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        format: wgpu::TextureFormat,
-    ) -> Self {
+    pub fn new(device: &wgpu::Device, queue: &wgpu::Queue, format: wgpu::TextureFormat) -> Self {
         let (atlas, metrics) = build_atlas();
 
         // Upload atlas texture
@@ -87,12 +83,7 @@ impl TextRenderer {
         });
 
         // Unit quad
-        let quad_vertices: [[f32; 2]; 4] = [
-            [-1.0, -1.0],
-            [1.0, -1.0],
-            [1.0, 1.0],
-            [-1.0, 1.0],
-        ];
+        let quad_vertices: [[f32; 2]; 4] = [[-1.0, -1.0], [1.0, -1.0], [1.0, 1.0], [-1.0, 1.0]];
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("text_quad_vertices"),
             contents: bytemuck::cast_slice(&quad_vertices),
@@ -302,7 +293,9 @@ impl TextRenderer {
                 let node_size = 3.0 + n.pagerank * 20.0;
                 let label_y = n.y + node_size + 2.0;
 
-                let total_width: f32 = n.label.chars()
+                let total_width: f32 = n
+                    .label
+                    .chars()
                     .filter_map(|ch| metrics.get(&ch))
                     .map(|m| m.advance * label_scale)
                     .sum();
@@ -369,11 +362,8 @@ impl TextRenderer {
 
 fn build_atlas() -> (Vec<u8>, HashMap<char, GlyphMetrics>) {
     let font_data = include_bytes!("../../assets/fonts/Inter-Regular.ttf");
-    let font = fontdue::Font::from_bytes(
-        font_data as &[u8],
-        fontdue::FontSettings::default(),
-    )
-    .expect("failed to parse font");
+    let font = fontdue::Font::from_bytes(font_data as &[u8], fontdue::FontSettings::default())
+        .expect("failed to parse font");
 
     let mut atlas = vec![0u8; ATLAS_SIZE * ATLAS_SIZE];
     let mut metrics = HashMap::new();
@@ -426,15 +416,18 @@ fn build_atlas() -> (Vec<u8>, HashMap<char, GlyphMetrics>) {
             (cursor_y + sdf_h) as f32 / ATLAS_SIZE as f32,
         ];
 
-        metrics.insert(ch, GlyphMetrics {
-            uv_min,
-            uv_max,
-            advance: m.advance_width,
-            bearing_x: m.xmin as f32,
-            bearing_y: (m.height as i32 + m.ymin) as f32,
-            width: sdf_w as f32,
-            height: sdf_h as f32,
-        });
+        metrics.insert(
+            ch,
+            GlyphMetrics {
+                uv_min,
+                uv_max,
+                advance: m.advance_width,
+                bearing_x: m.xmin as f32,
+                bearing_y: (m.height as i32 + m.ymin) as f32,
+                width: sdf_w as f32,
+                height: sdf_h as f32,
+            },
+        );
 
         cursor_x += sdf_w + GLYPH_PAD;
         row_height = row_height.max(sdf_h);
@@ -516,8 +509,8 @@ fn edt_1d(f: &mut [f32], d: &mut [f32], z: &mut [f32], v: &mut [usize], n: usize
     for q in 1..n {
         loop {
             let vk = v[k];
-            let s = ((f[q] + (q * q) as f32) - (f[vk] + (vk * vk) as f32))
-                / (2 * q - 2 * vk) as f32;
+            let s =
+                ((f[q] + (q * q) as f32) - (f[vk] + (vk * vk) as f32)) / (2 * q - 2 * vk) as f32;
             if s > z[k] {
                 k += 1;
                 v[k] = q;
@@ -556,7 +549,11 @@ mod tests {
         }
         let sdf = compute_sdf(&bitmap, w, h, 6.0);
         // Center should be inside (> 128)
-        assert!(sdf[10 * w + 10] > 128, "center pixel should be inside: {}", sdf[10 * w + 10]);
+        assert!(
+            sdf[10 * w + 10] > 128,
+            "center pixel should be inside: {}",
+            sdf[10 * w + 10]
+        );
         // Corner should be outside (< 128)
         assert!(sdf[0] < 128, "corner pixel should be outside: {}", sdf[0]);
     }
@@ -598,8 +595,14 @@ mod tests {
         assert!(m.advance > 0.0, "advance should be positive");
         assert!(m.width > 0.0, "width should be positive");
         assert!(m.height > 0.0, "height should be positive");
-        assert!(m.uv_min[0] < m.uv_max[0], "uv_min.x should be less than uv_max.x");
-        assert!(m.uv_min[1] < m.uv_max[1], "uv_min.y should be less than uv_max.y");
+        assert!(
+            m.uv_min[0] < m.uv_max[0],
+            "uv_min.x should be less than uv_max.x"
+        );
+        assert!(
+            m.uv_min[1] < m.uv_max[1],
+            "uv_min.y should be less than uv_max.y"
+        );
     }
 
     #[test]
@@ -608,7 +611,8 @@ mod tests {
         let label = "Test";
         let label_scale = 1.0 / RASTER_PX;
 
-        let total_width: f32 = label.chars()
+        let total_width: f32 = label
+            .chars()
             .filter_map(|ch| metrics.get(&ch))
             .map(|m| m.advance * label_scale)
             .sum();

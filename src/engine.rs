@@ -122,26 +122,25 @@ impl BloomEngine {
             match backend.begin_frame() {
                 Ok((frame, view, mut encoder)) => {
                     {
-                        let mut pass =
-                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                                label: Some("bloom_render_pass"),
-                                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                                    view: &view,
-                                    depth_slice: None,
-                                    resolve_target: None,
-                                    ops: wgpu::Operations {
-                                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                                            r: 0.05,
-                                            g: 0.05,
-                                            b: 0.08,
-                                            a: 1.0,
-                                        }),
-                                        store: wgpu::StoreOp::Store,
-                                    },
-                                })],
-                                depth_stencil_attachment: None,
-                                ..Default::default()
-                            });
+                        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("bloom_render_pass"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                depth_slice: None,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                                        r: 0.05,
+                                        g: 0.05,
+                                        b: 0.08,
+                                        a: 1.0,
+                                    }),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            ..Default::default()
+                        });
 
                         edge_renderer.draw(&mut pass);
                         node_renderer.draw(&mut pass);
@@ -222,7 +221,12 @@ fn lcg_next(state: u32) -> (u32, f32) {
 
 fn build_quadtree(graph: &Graph) -> Quadtree {
     let nodes = graph.nodes();
-    let default_bounds = AABB { min_x: -100.0, min_y: -100.0, max_x: 100.0, max_y: 100.0 };
+    let default_bounds = AABB {
+        min_x: -100.0,
+        min_y: -100.0,
+        max_x: 100.0,
+        max_y: 100.0,
+    };
     let bounds = AABB::enclosing(nodes.iter().map(|n| (n.x, n.y)))
         .map(|b| b.padded(0.05))
         .unwrap_or(default_bounds);
