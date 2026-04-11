@@ -1,0 +1,23 @@
+{
+  "name": "bloom",
+  "type": "module",
+  "description": "GPU-accelerated graph visualization engine for the browser",
+  "version": "0.1.0",
+  "license": "BSD-3-Clause",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/real-limoges/bloom"
+  },
+  "files": [
+    "bloom_bg.wasm",
+    "bloom.js",
+    "bloom_bg.js",
+    "bloom.d.ts"
+  ],
+  "main": "bloom.js",
+  "types": "bloom.d.ts",
+  "sideEffects": [
+    "./bloom.js",
+    "./snippets/*"
+  ]
+}
