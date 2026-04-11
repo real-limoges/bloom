@@ -1,7 +1,11 @@
 use crate::graph::{AABB, Graph, Node, Quadtree};
 use crate::layout::{ForceLayout, ForceParams};
 use crate::protocol::decode::Decoder;
+use crate::render::backend::RenderBackend;
 use crate::render::camera::Camera;
+use crate::render::edges::EdgeRenderer;
+use crate::render::nodes::NodeRenderer;
+use crate::render::text::TextRenderer;
 
 pub struct BloomEngine {
     graph: Option<Graph>,
@@ -10,6 +14,10 @@ pub struct BloomEngine {
     quadtree: Option<Quadtree>,
     canvas_width: f32,
     canvas_height: f32,
+    backend: Option<RenderBackend>,
+    node_renderer: Option<NodeRenderer>,
+    edge_renderer: Option<EdgeRenderer>,
+    text_renderer: Option<TextRenderer>,
 }
 
 impl BloomEngine {
@@ -21,7 +29,27 @@ impl BloomEngine {
             quadtree: None,
             canvas_width: width,
             canvas_height: height,
+            backend: None,
+            node_renderer: None,
+            edge_renderer: None,
+            text_renderer: None,
         }
+    }
+
+    pub async fn init_renderer(
+        &mut self,
+        canvas: web_sys::HtmlCanvasElement,
+    ) -> Result<(), String> {
+        let backend = RenderBackend::new(canvas).await?;
+        let format = backend.format();
+        let node_renderer = NodeRenderer::new(&backend.device, format);
+        let edge_renderer = EdgeRenderer::new(&backend.device, format);
+        let text_renderer = TextRenderer::new(&backend.device, &backend.queue, format);
+        self.backend = Some(backend);
+        self.node_renderer = Some(node_renderer);
+        self.edge_renderer = Some(edge_renderer);
+        self.text_renderer = Some(text_renderer);
+        Ok(())
     }
 
     pub fn load_graph(&mut self, data: &[u8]) -> Result<(), String> {
@@ -29,19 +57,16 @@ impl BloomEngine {
         let mut graph = decoder.decode_graph()?;
 
         // Randomize initial positions with deterministic LCG (seed=42)
-        let n = graph.node_count();
-        let radius = (n as f32).sqrt() * 10.0;
-        let mut lcg = 42u32;
-        for node in graph.nodes_mut() {
-            lcg = lcg.wrapping_mul(1664525).wrapping_add(1013904223);
-            let rx = (lcg as f32 / u32::MAX as f32) * 2.0 - 1.0;
-            lcg = lcg.wrapping_mul(1664525).wrapping_add(1013904223);
-            let ry = (lcg as f32 / u32::MAX as f32) * 2.0 - 1.0;
+        let radius = (graph.node_count() as f32).sqrt() * 10.0;
+        graph.nodes_mut().iter_mut().fold(42u32, |lcg, node| {
+            let (lcg, rx) = lcg_next(lcg);
+            let (lcg, ry) = lcg_next(lcg);
             node.x = rx * radius;
             node.y = ry * radius;
-        }
+            lcg
+        });
 
-        let layout = ForceLayout::new(n, ForceParams::default());
+        let layout = ForceLayout::new(graph.node_count(), ForceParams::default());
         let quadtree = build_quadtree(&graph);
 
         self.graph = Some(graph);
@@ -58,11 +83,87 @@ impl BloomEngine {
             self.quadtree = Some(build_quadtree(graph));
         }
         self.camera.update(dt);
+
+        // Render if backend is initialized
+        if let (Some(backend), Some(node_renderer), Some(edge_renderer)) = (
+            &self.backend,
+            &mut self.node_renderer,
+            &mut self.edge_renderer,
+        ) {
+            if let Some(graph) = &self.graph {
+                node_renderer.update(
+                    &backend.device,
+                    &backend.queue,
+                    graph.nodes(),
+                    &self.camera,
+                    self.canvas_width,
+                    self.canvas_height,
+                );
+                edge_renderer.update(
+                    &backend.device,
+                    &backend.queue,
+                    graph,
+                    &self.camera,
+                    self.canvas_width,
+                    self.canvas_height,
+                );
+                if let Some(text_renderer) = &mut self.text_renderer {
+                    text_renderer.update(
+                        &backend.device,
+                        &backend.queue,
+                        graph.nodes(),
+                        &self.camera,
+                        self.canvas_width,
+                        self.canvas_height,
+                    );
+                }
+            }
+
+            match backend.begin_frame() {
+                Ok((frame, view, mut encoder)) => {
+                    {
+                        let mut pass =
+                            encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                                label: Some("bloom_render_pass"),
+                                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                    view: &view,
+                                    depth_slice: None,
+                                    resolve_target: None,
+                                    ops: wgpu::Operations {
+                                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                                            r: 0.05,
+                                            g: 0.05,
+                                            b: 0.08,
+                                            a: 1.0,
+                                        }),
+                                        store: wgpu::StoreOp::Store,
+                                    },
+                                })],
+                                depth_stencil_attachment: None,
+                                ..Default::default()
+                            });
+
+                        edge_renderer.draw(&mut pass);
+                        node_renderer.draw(&mut pass);
+                        if let Some(text_renderer) = &self.text_renderer {
+                            text_renderer.draw(&mut pass);
+                        }
+                    }
+                    backend.end_frame(encoder, frame);
+                }
+                Err(e) => {
+                    log::warn!("Frame dropped: {}", e);
+                }
+            }
+        }
     }
 
     pub fn resize(&mut self, width: f32, height: f32) {
         self.canvas_width = width;
         self.canvas_height = height;
+        if let Some(backend) = &mut self.backend {
+            backend.resize(width as u32, height as u32);
+        }
     }
 
     pub fn node_at(&self, screen_x: f32, screen_y: f32) -> Option<&Node> {
@@ -93,7 +194,7 @@ impl BloomEngine {
                     None
                 }
             })
-            .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
+            .min_by(|a, b| a.0.total_cmp(&b.0))
             .map(|(_, node)| node)
     }
 
@@ -114,42 +215,17 @@ impl BloomEngine {
     }
 }
 
+fn lcg_next(state: u32) -> (u32, f32) {
+    let state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+    (state, (state as f32 / u32::MAX as f32) * 2.0 - 1.0)
+}
+
 fn build_quadtree(graph: &Graph) -> Quadtree {
     let nodes = graph.nodes();
-    if nodes.is_empty() {
-        return Quadtree::new(
-            AABB {
-                min_x: -100.0,
-                min_y: -100.0,
-                max_x: 100.0,
-                max_y: 100.0,
-            },
-            4,
-        );
-    }
-
-    let mut min_x = f32::INFINITY;
-    let mut min_y = f32::INFINITY;
-    let mut max_x = f32::NEG_INFINITY;
-    let mut max_y = f32::NEG_INFINITY;
-
-    for node in nodes {
-        min_x = min_x.min(node.x);
-        min_y = min_y.min(node.y);
-        max_x = max_x.max(node.x);
-        max_y = max_y.max(node.y);
-    }
-
-    // 5% padding
-    let pad_x = (max_x - min_x) * 0.05 + 1.0;
-    let pad_y = (max_y - min_y) * 0.05 + 1.0;
-
-    let bounds = AABB {
-        min_x: min_x - pad_x,
-        min_y: min_y - pad_y,
-        max_x: max_x + pad_x,
-        max_y: max_y + pad_y,
-    };
+    let default_bounds = AABB { min_x: -100.0, min_y: -100.0, max_x: 100.0, max_y: 100.0 };
+    let bounds = AABB::enclosing(nodes.iter().map(|n| (n.x, n.y)))
+        .map(|b| b.padded(0.05))
+        .unwrap_or(default_bounds);
 
     let mut qt = Quadtree::new(bounds, 4);
     for (i, node) in nodes.iter().enumerate() {

@@ -36,6 +36,33 @@ impl AABB {
         )
     }
 
+    /// Compute the tight bounding box around an iterator of (x, y) points.
+    pub fn enclosing(points: impl Iterator<Item = (f32, f32)>) -> Option<Self> {
+        points.fold(None, |acc, (x, y)| {
+            Some(match acc {
+                None => AABB { min_x: x, min_y: y, max_x: x, max_y: y },
+                Some(b) => AABB {
+                    min_x: b.min_x.min(x),
+                    min_y: b.min_y.min(y),
+                    max_x: b.max_x.max(x),
+                    max_y: b.max_y.max(y),
+                },
+            })
+        })
+    }
+
+    /// Expand bounds by a proportional factor plus a fixed minimum.
+    pub fn padded(&self, factor: f32) -> Self {
+        let pad_x = self.width() * factor + 1.0;
+        let pad_y = self.height() * factor + 1.0;
+        AABB {
+            min_x: self.min_x - pad_x,
+            min_y: self.min_y - pad_y,
+            max_x: self.max_x + pad_x,
+            max_y: self.max_y + pad_y,
+        }
+    }
+
     pub fn subdivide(&self) -> [AABB; 4] {
         let (cx, cy) = self.center();
         [

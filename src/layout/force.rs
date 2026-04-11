@@ -45,27 +45,21 @@ impl ForceLayout {
             *force += tree.compute_repulsion(i, nodes, self.params.repulsion, self.params.theta);
         }
 
-        // attraction
-        let edge_pairs: Vec<(u32, u32)> =
-            graph.edges().iter().map(|e| (e.source, e.target)).collect();
-        for (source, target) in edge_pairs {
-            if let (Some(i), Some(j)) = (graph.node_index(source), graph.node_index(target)) {
+        // attraction (iterate edges directly — all borrows are immutable)
+        for edge in graph.edges() {
+            if let (Some(i), Some(j)) = (graph.node_index(edge.source), graph.node_index(edge.target)) {
                 let nodes = graph.nodes();
-                let pi = Vec2::new(nodes[i].x, nodes[i].y);
-                let pj = Vec2::new(nodes[j].x, nodes[j].y);
-                let delta = pj - pi;
-                let dist = delta.length().max(0.1);
-                let f = delta.normalize() * (dist * self.params.attraction);
-
+                let delta = Vec2::new(nodes[j].x - nodes[i].x, nodes[j].y - nodes[i].y);
+                let f = delta.normalize() * (delta.length().max(0.1) * self.params.attraction);
                 forces[i] += f;
                 forces[j] -= f;
             }
         }
 
         // gravity
-        for (i, node) in graph.nodes().iter().enumerate() {
+        graph.nodes().iter().enumerate().for_each(|(i, node)| {
             forces[i] -= Vec2::new(node.x, node.y) * self.params.gravity;
-        }
+        });
 
         // integrate
         for (i, node) in graph.nodes_mut().iter_mut().enumerate() {

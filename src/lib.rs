@@ -49,4 +49,14 @@ impl BloomEngine {
     pub fn focus_node(&mut self, node_id: u32) {
         self.inner.focus_node(node_id);
     }
+
+    pub async fn init_renderer(
+        &mut self,
+        canvas: web_sys::HtmlCanvasElement,
+    ) -> Result<(), JsValue> {
+        self.inner
+            .init_renderer(canvas)
+            .await
+            .map_err(|e| JsValue::from_str(&e))
+    }
 }
