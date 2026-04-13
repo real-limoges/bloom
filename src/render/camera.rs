@@ -40,6 +40,15 @@ impl Camera {
         self.target_zoom = zoom;
     }
 
+    pub fn snap_to(&mut self, x: f32, y: f32, zoom: f32) {
+        self.x = x;
+        self.y = y;
+        self.zoom = zoom;
+        self.target_x = x;
+        self.target_y = y;
+        self.target_zoom = zoom;
+    }
+
     pub fn world_to_screen(&self, wx: f32, wy: f32, canvas_w: f64, canvas_h: f64) -> (f64, f64) {
         let sx = ((wx - self.x) * self.zoom + canvas_w as f32 / 2.0) as f64;
         let sy = ((wy - self.y) * self.zoom + canvas_h as f32 / 2.0) as f64;

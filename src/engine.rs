@@ -18,6 +18,9 @@ pub struct BloomEngine {
     node_renderer: Option<NodeRenderer>,
     edge_renderer: Option<EdgeRenderer>,
     text_renderer: Option<TextRenderer>,
+    /// Frames remaining where layout runs at high substep count for fast
+    /// initial convergence. Decremented each tick.
+    warmup_frames: u32,
 }
 
 impl BloomEngine {
@@ -33,6 +36,7 @@ impl BloomEngine {
             node_renderer: None,
             edge_renderer: None,
             text_renderer: None,
+            warmup_frames: 0,
         }
     }
 
@@ -56,30 +60,61 @@ impl BloomEngine {
         let mut decoder = Decoder::new(data);
         let mut graph = decoder.decode_graph()?;
 
-        // Randomize initial positions with deterministic LCG (seed=42)
-        let radius = (graph.node_count() as f32).sqrt() * 10.0;
-        graph.nodes_mut().iter_mut().fold(42u32, |lcg, node| {
-            let (lcg, rx) = lcg_next(lcg);
-            let (lcg, ry) = lcg_next(lcg);
-            node.x = rx * radius;
-            node.y = ry * radius;
-            lcg
-        });
+        // Seed on a ring instead of random scatter. Starting from a circle
+        // gives the force layout a topology that converges in a handful of
+        // substeps without the chaotic "ball of yarn" transient.
+        let n = graph.node_count() as f32;
+        let radius = (n.sqrt() * 14.0).max(40.0);
+        let two_pi = std::f32::consts::TAU;
+        for (i, node) in graph.nodes_mut().iter_mut().enumerate() {
+            let theta = (i as f32) * two_pi / n.max(1.0);
+            node.x = theta.cos() * radius;
+            node.y = theta.sin() * radius;
+        }
 
         let layout = ForceLayout::new(graph.node_count(), ForceParams::default());
         let quadtree = build_quadtree(&graph);
 
+        // Fit the camera to the initial node cloud so content isn't a
+        // cluster of specks in a huge viewport. Canvas_w/h are world units
+        // covered at zoom=1, so the zoom needed to fit an AABB of size
+        // (aabb_w, aabb_h) with padding P is min(cw/(aw*P), ch/(ah*P)).
+        let (cx, cy, zoom) = AABB::enclosing(graph.nodes().iter().map(|n| (n.x, n.y)))
+            .map(|b| {
+                let (cx, cy) = b.center();
+                let aw = b.width().max(1.0);
+                let ah = b.height().max(1.0);
+                let pad = 1.4;
+                let zx = self.canvas_width / (aw * pad);
+                let zy = self.canvas_height / (ah * pad);
+                (cx, cy, zx.min(zy).clamp(0.1, 50.0))
+            })
+            .unwrap_or((0.0, 0.0, 1.0));
+
         self.graph = Some(graph);
         self.layout = Some(layout);
         self.quadtree = Some(quadtree);
-        self.camera.focus_on(0.0, 0.0, 1.0);
+        self.camera.snap_to(cx, cy, zoom);
+        // Run aggressive multi-substep physics for ~1 second so the graph
+        // visibly snaps to a reasonable layout instead of drifting in chaos.
+        self.warmup_frames = 60;
 
         Ok(())
     }
 
     pub fn tick(&mut self, dt: f32) {
         if let (Some(graph), Some(layout)) = (&mut self.graph, &mut self.layout) {
-            layout.step(graph);
+            // During warm-up run multiple physics substeps per rendered
+            // frame so the layout converges in roughly one second instead of
+            // five. After the warm-up budget is spent, fall back to a single
+            // step so interactive panning stays cheap.
+            let substeps = if self.warmup_frames > 0 { 4 } else { 1 };
+            for _ in 0..substeps {
+                layout.step(graph);
+            }
+            if self.warmup_frames > 0 {
+                self.warmup_frames -= 1;
+            }
             self.quadtree = Some(build_quadtree(graph));
         }
         self.camera.update(dt);
@@ -129,10 +164,12 @@ impl BloomEngine {
                                 depth_slice: None,
                                 resolve_target: None,
                                 ops: wgpu::Operations {
+                                    // Deep purple-black, matching the site's
+                                    // synthwave dark base-300.
                                     load: wgpu::LoadOp::Clear(wgpu::Color {
-                                        r: 0.05,
-                                        g: 0.05,
-                                        b: 0.08,
+                                        r: 0.035,
+                                        g: 0.020,
+                                        b: 0.055,
                                         a: 1.0,
                                     }),
                                     store: wgpu::StoreOp::Store,
@@ -212,11 +249,10 @@ impl BloomEngine {
     pub fn camera(&self) -> &Camera {
         &self.camera
     }
-}
 
-fn lcg_next(state: u32) -> (u32, f32) {
-    let state = state.wrapping_mul(1664525).wrapping_add(1013904223);
-    (state, (state as f32 / u32::MAX as f32) * 2.0 - 1.0)
+    pub fn camera_mut(&mut self) -> &mut Camera {
+        &mut self.camera
+    }
 }
 
 fn build_quadtree(graph: &Graph) -> Quadtree {
@@ -305,12 +341,12 @@ mod tests {
         engine.graph.as_mut().unwrap().nodes_mut()[1].x = 100.0;
         engine.graph.as_mut().unwrap().nodes_mut()[1].y = 100.0;
 
-        // Rebuild quadtree with new positions
+        // Reset camera so the hit test is independent of load_graph's auto-fit.
+        engine.camera_mut().snap_to(0.0, 0.0, 1.0);
         engine.tick(0.0);
 
-        // Screen center maps to world origin (camera at 0,0 zoom 1)
-        // After tick(0.0), camera hasn't moved much from focus_on(0,0,1)
-        // Screen center = (400, 300), which maps to world ~(0,0)
+        // Screen center (400, 300) maps to world origin at zoom 1, so node 0
+        // at (0, 0) should be hit.
         let hit = engine.node_at(400.0, 300.0);
         assert!(hit.is_some(), "should hit node near origin");
     }

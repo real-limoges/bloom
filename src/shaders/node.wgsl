@@ -37,10 +37,28 @@ fn vs_main(vertex: VertexInput, instance: InstanceInput) -> VertexOutput {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    // Signed distance from the unit-circle boundary (in [-1, 1] quad space).
     let dist = length(in.uv);
-    let alpha = 1.0 - smoothstep(0.85, 1.0, dist);
-    if alpha < 0.01 {
+
+    // Hard edge of the disc, antialiased by one fragment.
+    let edge = 1.0 - smoothstep(0.90, 1.0, dist);
+    if edge < 0.001 {
         discard;
     }
-    return vec4<f32>(in.color.rgb, in.color.a * alpha);
+
+    // Radial falloff from the center — white-hot core that drops to the
+    // instance color at the rim. Squared to concentrate the brightness.
+    let core_mask = 1.0 - smoothstep(0.0, 0.75, dist);
+    let core = core_mask * core_mask;
+
+    // Halo just past the rim — sits inside the edge cutoff so it only
+    // shows up on nodes, not as full-quad bloom.
+    let halo = (1.0 - smoothstep(0.55, 0.95, dist)) * 0.35;
+
+    // Brighten toward the core by mixing in near-white over the base color.
+    let base = in.color.rgb;
+    let hot = mix(base, vec3<f32>(1.0, 0.92, 0.98), core);
+    let rgb = hot + base * halo;
+
+    return vec4<f32>(rgb, in.color.a * edge);
 }

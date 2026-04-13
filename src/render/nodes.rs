@@ -182,12 +182,37 @@ impl NodeRenderer {
         canvas_w: f32,
         canvas_h: f32,
     ) {
+        // Size by log(degree) so high-degree nodes dominate without drowning
+        // low-degree ones. Pagerank floats are too flat to drive size here.
+        // Color interpolates from a cool magenta (low degree) toward a hot
+        // pink-white (high degree) along the site's neon-pink axis — chosen
+        // as a single perceptual dimension so it reads even for colorblind
+        // viewers.
+        let max_deg = nodes
+            .iter()
+            .map(|n| n.degree as f32)
+            .fold(1.0_f32, f32::max);
+        let log_max = (max_deg + 1.0).ln().max(1.0);
+
+        let cold = [0.55_f32, 0.15, 0.60]; // deep magenta
+        let hot = [1.00_f32, 0.40, 0.85]; // neon pink
+
         let gpu_nodes: Vec<GpuNode> = nodes
             .iter()
-            .map(|n| GpuNode {
-                position: [n.x, n.y],
-                size: 3.0 + n.pagerank * 20.0,
-                color: [0.29, 0.56, 0.89, 1.0],
+            .map(|n| {
+                let t = ((n.degree as f32 + 1.0).ln() / log_max).clamp(0.0, 1.0);
+                let size = 6.0 + 14.0 * t;
+                let color = [
+                    cold[0] + (hot[0] - cold[0]) * t,
+                    cold[1] + (hot[1] - cold[1]) * t,
+                    cold[2] + (hot[2] - cold[2]) * t,
+                    1.0,
+                ];
+                GpuNode {
+                    position: [n.x, n.y],
+                    size,
+                    color,
+                }
             })
             .collect();
 

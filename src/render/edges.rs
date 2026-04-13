@@ -142,7 +142,9 @@ impl EdgeRenderer {
         canvas_w: f32,
         canvas_h: f32,
     ) {
-        let edge_color = [0.5, 0.5, 0.5, 0.3];
+        // Dim neon pink — low alpha lets dense edge bundles read as glow
+        // instead of a gray mud, and blends nicely with the synthwave background.
+        let edge_color = [0.85, 0.30, 0.75, 0.18];
         let nodes = graph.nodes();
         let vertices: Vec<GpuEdgeVertex> = graph
             .edges()
