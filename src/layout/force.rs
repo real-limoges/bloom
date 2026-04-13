@@ -52,7 +52,11 @@ impl ForceLayout {
             {
                 let nodes = graph.nodes();
                 let delta = Vec2::new(nodes[j].x - nodes[i].x, nodes[j].y - nodes[i].y);
-                let f = delta.normalize() * (delta.length().max(0.1) * self.params.attraction);
+                let len = delta.length();
+                if len < 1e-4 {
+                    continue;
+                }
+                let f = (delta / len) * (len * self.params.attraction);
                 forces[i] += f;
                 forces[j] -= f;
             }
@@ -63,11 +67,26 @@ impl ForceLayout {
             forces[i] -= Vec2::new(node.x, node.y) * self.params.gravity;
         });
 
-        // integrate
+        // integrate. Defensively sanitize NaN/inf — a single bad float here
+        // poisons the quadtree bounds via AABB::enclosing, which then panics
+        // inside f32::clamp when the hit-test queries it. panic=abort in wasm
+        // leaves the WasmRefCell locked, so every subsequent call dies.
         for (i, node) in graph.nodes_mut().iter_mut().enumerate() {
-            self.velocities[i] = (self.velocities[i] + forces[i]) * self.params.damping;
-            node.x += self.velocities[i].x;
-            node.y += self.velocities[i].y;
+            let v = self.velocities[i] + forces[i];
+            let v = if v.is_finite() {
+                v * self.params.damping
+            } else {
+                Vec2::ZERO
+            };
+            self.velocities[i] = v;
+            let nx = node.x + v.x;
+            let ny = node.y + v.y;
+            if nx.is_finite() && ny.is_finite() {
+                node.x = nx;
+                node.y = ny;
+            } else {
+                self.velocities[i] = Vec2::ZERO;
+            }
         }
     }
 }

@@ -14,6 +14,12 @@ impl AABB {
     }
 
     pub fn intersects_circle(&self, cx: f32, cy: f32, radius: f32) -> bool {
+        // f32::clamp panics if either bound is NaN or min > max. Reject
+        // degenerate boxes explicitly so a poisoned quadtree can't take down
+        // the whole hit-test path.
+        if !(self.min_x <= self.max_x && self.min_y <= self.max_y) {
+            return false;
+        }
         let nearest_x = cx.clamp(self.min_x, self.max_x);
         let nearest_y = cy.clamp(self.min_y, self.max_y);
         let dx = cx - nearest_x;

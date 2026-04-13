@@ -19,6 +19,7 @@ pub struct BloomEngine {
 impl BloomEngine {
     #[wasm_bindgen(constructor)]
     pub fn new(canvas: web_sys::HtmlCanvasElement) -> Result<BloomEngine, JsValue> {
+        console_error_panic_hook::set_once();
         wasm_logger::init(wasm_logger::Config::default());
         log::info!("Bloom engine initializing");
         let width = canvas.width() as f32;

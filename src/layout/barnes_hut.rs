@@ -102,13 +102,19 @@ impl QuadNode {
                 children,
             } => {
                 let delta = pos - *center_of_mass;
-                let dist = delta.length().max(EPSILON);
+                let raw_dist = delta.length();
+                if raw_dist < EPSILON {
+                    return Vec2::ZERO;
+                }
+                let dist = raw_dist;
                 let s = bounds.width().max(bounds.height());
 
                 if s / dist < theta {
-                    // Treat as single body
-                    let dist = dist.max(MIN_DIST);
-                    delta.normalize() * (repulsion * *total_mass / (dist * dist))
+                    // Treat as single body. Use delta/dist instead of normalize()
+                    // to avoid a second length() computation and to make the
+                    // zero-delta guard above load-bearing.
+                    let eff = dist.max(MIN_DIST);
+                    (delta / dist) * (repulsion * *total_mass / (eff * eff))
                 } else {
                     let sub_bounds = bounds.subdivide();
                     children
