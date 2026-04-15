@@ -1,3 +1,4 @@
+use crate::spatial::AABB;
 use glam::Mat4;
 
 pub struct Camera {
@@ -42,28 +43,20 @@ impl Camera {
 
     /// Fit an AABB into the canvas with a fractional padding margin (e.g. 0.1 = 10%
     /// breathing room on each side). Sets targets — call `update` to converge.
-    pub fn fit_to_bounds(
-        &mut self,
-        min_x: f32,
-        min_y: f32,
-        max_x: f32,
-        max_y: f32,
-        canvas_w: f32,
-        canvas_h: f32,
-        padding: f32,
-    ) {
+    pub fn fit_to_bounds(&mut self, bounds: &AABB, canvas_w: f32, canvas_h: f32, padding: f32) {
         if canvas_w <= 0.0 || canvas_h <= 0.0 {
             return;
         }
-        let bbox_w = (max_x - min_x).max(1.0);
-        let bbox_h = (max_y - min_y).max(1.0);
+        let bbox_w = bounds.width().max(1.0);
+        let bbox_h = bounds.height().max(1.0);
         let scale = 1.0 + padding * 2.0;
         let zoom_x = canvas_w / (bbox_w * scale);
         let zoom_y = canvas_h / (bbox_h * scale);
         let zoom = zoom_x.min(zoom_y).clamp(0.01, 10.0);
 
-        self.target_x = (min_x + max_x) * 0.5;
-        self.target_y = (min_y + max_y) * 0.5;
+        let (cx, cy) = bounds.center();
+        self.target_x = cx;
+        self.target_y = cy;
         self.target_zoom = zoom;
     }
 
@@ -183,6 +176,106 @@ mod tests {
 
         // At 2x zoom, the same world point should be further in clip space
         assert!((clip2.x / clip2.w).abs() > (clip1.x / clip1.w).abs());
+    }
+
+    #[test]
+    fn fit_to_bounds_centers_and_zooms_square() {
+        let mut c = Camera::new();
+        let b = AABB {
+            min_x: -50.0,
+            min_y: -50.0,
+            max_x: 50.0,
+            max_y: 50.0,
+        };
+        // Square canvas, square bounds, no padding → zoom 1.0 and centered at 0.
+        c.fit_to_bounds(&b, 100.0, 100.0, 0.0);
+        assert!((c.target_x - 0.0).abs() < 1e-5);
+        assert!((c.target_y - 0.0).abs() < 1e-5);
+        assert!((c.target_zoom - 1.0).abs() < 1e-5, "zoom={}", c.target_zoom);
+    }
+
+    #[test]
+    fn fit_to_bounds_offset_center() {
+        let mut c = Camera::new();
+        let b = AABB {
+            min_x: 100.0,
+            min_y: 200.0,
+            max_x: 300.0,
+            max_y: 400.0,
+        };
+        c.fit_to_bounds(&b, 400.0, 400.0, 0.0);
+        assert!((c.target_x - 200.0).abs() < 1e-4);
+        assert!((c.target_y - 300.0).abs() < 1e-4);
+        // bbox 200x200 fit into 400x400 → zoom 2.0
+        assert!((c.target_zoom - 2.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn fit_to_bounds_aspect_takes_smaller_zoom() {
+        let mut c = Camera::new();
+        // Wide bounds (200x10) into tall canvas (100x200): width is the binding side.
+        let b = AABB {
+            min_x: 0.0,
+            min_y: 0.0,
+            max_x: 200.0,
+            max_y: 10.0,
+        };
+        c.fit_to_bounds(&b, 100.0, 200.0, 0.0);
+        // zoom_x = 100/200 = 0.5, zoom_y = 200/10 = 20 → min = 0.5
+        assert!((c.target_zoom - 0.5).abs() < 1e-4, "zoom={}", c.target_zoom);
+    }
+
+    #[test]
+    fn fit_to_bounds_padding_shrinks_zoom() {
+        let mut c_nopad = Camera::new();
+        let mut c_pad = Camera::new();
+        let b = AABB {
+            min_x: -50.0,
+            min_y: -50.0,
+            max_x: 50.0,
+            max_y: 50.0,
+        };
+        c_nopad.fit_to_bounds(&b, 100.0, 100.0, 0.0);
+        c_pad.fit_to_bounds(&b, 100.0, 100.0, 0.25);
+        assert!(
+            c_pad.target_zoom < c_nopad.target_zoom,
+            "padding should shrink zoom: no-pad={} padded={}",
+            c_nopad.target_zoom,
+            c_pad.target_zoom
+        );
+    }
+
+    #[test]
+    fn fit_to_bounds_zero_canvas_no_op() {
+        let mut c = Camera::new();
+        let (tx, ty, tz) = (c.target_x, c.target_y, c.target_zoom);
+        let b = AABB {
+            min_x: 0.0,
+            min_y: 0.0,
+            max_x: 10.0,
+            max_y: 10.0,
+        };
+        c.fit_to_bounds(&b, 0.0, 100.0, 0.0);
+        assert_eq!((c.target_x, c.target_y, c.target_zoom), (tx, ty, tz));
+        c.fit_to_bounds(&b, 100.0, 0.0, 0.0);
+        assert_eq!((c.target_x, c.target_y, c.target_zoom), (tx, ty, tz));
+    }
+
+    #[test]
+    fn fit_to_bounds_degenerate_bounds() {
+        // A zero-area bbox should not divide by zero or blow up zoom.
+        let mut c = Camera::new();
+        let b = AABB {
+            min_x: 5.0,
+            min_y: 5.0,
+            max_x: 5.0,
+            max_y: 5.0,
+        };
+        c.fit_to_bounds(&b, 100.0, 100.0, 0.0);
+        assert!(c.target_zoom.is_finite());
+        assert!(c.target_zoom <= 10.0, "zoom clamped: {}", c.target_zoom);
+        assert!((c.target_x - 5.0).abs() < 1e-5);
+        assert!((c.target_y - 5.0).abs() < 1e-5);
     }
 
     #[test]

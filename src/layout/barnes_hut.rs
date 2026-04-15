@@ -240,6 +240,23 @@ mod tests {
     }
 
     #[test]
+    fn build_empty_does_not_panic() {
+        // No nodes — enclosing() returns None, build falls back to default bounds.
+        // In practice `compute_repulsion` is never called (caller iterates nodes),
+        // so we only need to verify construction succeeds.
+        let _tree = BarnesHutTree::build(&[]);
+    }
+
+    #[test]
+    fn build_single_node_zero_self_force() {
+        let nodes = vec![make_node(0, 3.0, 4.0)];
+        let tree = BarnesHutTree::build(&nodes);
+        let f = tree.compute_repulsion(0, &nodes, 100.0, 0.7);
+        // A single node should feel no repulsion from itself.
+        assert_eq!(f, Vec2::ZERO);
+    }
+
+    #[test]
     fn force_approximation_accuracy() {
         let nodes: Vec<Node> = (0..10)
             .map(|i| {
@@ -258,11 +275,11 @@ mod tests {
             // Compute naive O(n²) force
             let pi = Vec2::new(nodes[i].x, nodes[i].y);
             let mut naive_force = Vec2::ZERO;
-            for j in 0..nodes.len() {
+            for (j, nj) in nodes.iter().enumerate() {
                 if i == j {
                     continue;
                 }
-                let pj = Vec2::new(nodes[j].x, nodes[j].y);
+                let pj = Vec2::new(nj.x, nj.y);
                 let delta = pi - pj;
                 let dist = delta.length().max(MIN_DIST);
                 naive_force += delta.normalize() * (repulsion / (dist * dist));

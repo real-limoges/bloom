@@ -91,7 +91,7 @@ mod tests {
     #[test]
     fn insert_and_query_returns_candidates() {
         let mut qt = Quadtree::new(world_bounds(), 4);
-        let nodes = vec![
+        let nodes = [
             make_node(0, 10.0, 10.0),
             make_node(1, 90.0, 90.0),
             make_node(2, 50.0, 50.0),
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn subdivide_on_overflow() {
         let mut qt = Quadtree::new(world_bounds(), 2);
-        let nodes = vec![
+        let nodes = [
             make_node(0, 10.0, 10.0),
             make_node(1, 20.0, 20.0),
             make_node(2, 30.0, 30.0),

@@ -58,6 +58,7 @@ impl Graph {
     pub fn node_index(&self, id: u32) -> Option<usize> {
         self.id_to_index.get(&id).copied()
     }
+    /// Undirected neighbors: every node connected by an edge in either direction.
     pub fn neighbors(&self, node_id: u32) -> Vec<u32> {
         self.edges
             .iter()
@@ -70,6 +71,15 @@ impl Graph {
                     None
                 }
             })
+            .collect()
+    }
+
+    /// Directed out-neighbors: targets of edges originating at `node_id`.
+    pub fn out_neighbors(&self, node_id: u32) -> Vec<u32> {
+        self.edges
+            .iter()
+            .filter(|e| e.source == node_id)
+            .map(|e| e.target)
             .collect()
     }
 
@@ -186,6 +196,16 @@ mod tests {
     fn neighbors_missing_node() {
         let g = sample_graph();
         assert!(g.neighbors(99).is_empty());
+    }
+
+    #[test]
+    fn out_neighbors_respects_direction() {
+        // sample_graph: 10 -> 20, 20 -> 30
+        let g = sample_graph();
+        assert_eq!(g.out_neighbors(10), vec![20]);
+        assert_eq!(g.out_neighbors(20), vec![30]);
+        assert!(g.out_neighbors(30).is_empty(), "sink has no out-neighbors");
+        assert!(g.out_neighbors(99).is_empty(), "missing id yields empty");
     }
 
     #[test]

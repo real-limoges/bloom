@@ -69,16 +69,9 @@ impl BloomEngine {
         let layout = ForceLayout::new(graph.node_count(), ForceParams::default());
         let quadtree = build_quadtree(&graph);
 
-        if let Some((min_x, min_y, max_x, max_y)) = percentile_bounds(graph.nodes(), 0.9) {
-            self.camera.fit_to_bounds(
-                min_x,
-                min_y,
-                max_x,
-                max_y,
-                self.canvas_width,
-                self.canvas_height,
-                0.1,
-            );
+        if let Some(bounds) = percentile_bounds(graph.nodes(), 0.9) {
+            self.camera
+                .fit_to_bounds(&bounds, self.canvas_width, self.canvas_height, 0.1);
         } else {
             self.camera.focus_on(0.0, 0.0, 1.0);
         }
@@ -95,16 +88,9 @@ impl BloomEngine {
             layout.step(graph);
             self.quadtree = Some(build_quadtree(graph));
 
-            if let Some((min_x, min_y, max_x, max_y)) = percentile_bounds(graph.nodes(), 0.9) {
-                self.camera.fit_to_bounds(
-                    min_x,
-                    min_y,
-                    max_x,
-                    max_y,
-                    self.canvas_width,
-                    self.canvas_height,
-                    0.1,
-                );
+            if let Some(bounds) = percentile_bounds(graph.nodes(), 0.9) {
+                self.camera
+                    .fit_to_bounds(&bounds, self.canvas_width, self.canvas_height, 0.1);
             }
         }
         self.camera.update(dt);
@@ -266,7 +252,7 @@ fn lcg_next(state: u32) -> (u32, f32) {
 /// AABB of the middle `percentile` fraction of nodes per axis. Robust to outliers
 /// that drift far from the main cluster — fits the camera to the dense core
 /// instead of letting one or two stragglers dominate the frame.
-fn percentile_bounds(nodes: &[Node], percentile: f32) -> Option<(f32, f32, f32, f32)> {
+fn percentile_bounds(nodes: &[Node], percentile: f32) -> Option<AABB> {
     if nodes.is_empty() {
         return None;
     }
@@ -278,7 +264,12 @@ fn percentile_bounds(nodes: &[Node], percentile: f32) -> Option<(f32, f32, f32, 
     let trim = (((n as f32) * (1.0 - percentile) * 0.5) as usize).min(n / 2);
     let lo = trim;
     let hi = (n - 1).saturating_sub(trim);
-    Some((xs[lo], ys[lo], xs[hi], ys[hi]))
+    Some(AABB {
+        min_x: xs[lo],
+        min_y: ys[lo],
+        max_x: xs[hi],
+        max_y: ys[hi],
+    })
 }
 
 fn build_quadtree(graph: &Graph) -> Quadtree {
@@ -378,6 +369,70 @@ mod tests {
     }
 
     #[test]
+    fn node_at_misses_when_no_node_nearby() {
+        let nodes = &[(1, 0.0f32, 0u16)];
+        let data = build_blom(nodes, &[], None);
+
+        let mut engine = BloomEngine::new(800.0, 600.0);
+        engine.load_graph(&data).unwrap();
+
+        engine.graph.as_mut().unwrap().nodes_mut()[0].x = 0.0;
+        engine.graph.as_mut().unwrap().nodes_mut()[0].y = 0.0;
+
+        // Snap camera to origin so screen-center = world-origin.
+        engine.camera.focus_on(0.0, 0.0, 1.0);
+        for _ in 0..200 {
+            engine.camera.update(0.016);
+        }
+        engine.tick(0.0);
+
+        // Click a corner of the canvas — the single node at world (0,0) is
+        // hundreds of pixels away, far outside the 10px hit radius at zoom 1.
+        assert!(engine.node_at(10.0, 10.0).is_none());
+    }
+
+    #[test]
+    fn node_at_hit_radius_shrinks_with_zoom() {
+        let nodes = &[(1, 0.0f32, 0u16)];
+        let data = build_blom(nodes, &[], None);
+
+        let mut engine = BloomEngine::new(800.0, 600.0);
+        engine.load_graph(&data).unwrap();
+        engine.graph.as_mut().unwrap().nodes_mut()[0].x = 0.0;
+        engine.graph.as_mut().unwrap().nodes_mut()[0].y = 0.0;
+
+        // Settle the camera at zoom 1 first.
+        engine.camera.focus_on(0.0, 0.0, 1.0);
+        for _ in 0..200 {
+            engine.camera.update(0.016);
+        }
+        engine.tick(0.0);
+
+        // At zoom 1, hit radius = 10px. Screen (405, 300) is ~5px from the
+        // node at screen (400, 300) → should hit.
+        assert!(engine.node_at(405.0, 300.0).is_some());
+
+        // Zoom in to 5x — hit radius shrinks to 2px in world units, but the
+        // node is still rendered at screen (400, 300); a click 8px away should
+        // miss because the hit test uses world-space radius / zoom = 10/5 = 2.
+        engine.camera.focus_on(0.0, 0.0, 5.0);
+        for _ in 0..200 {
+            engine.camera.update(0.016);
+        }
+        // World distance from screen (408, 300) to node at (0,0) is (8/5) = 1.6
+        // which is inside hit_radius=2 → still hits.
+        assert!(engine.node_at(408.0, 300.0).is_some());
+        // But world distance from screen (420, 300) is (20/5) = 4 → miss.
+        assert!(engine.node_at(420.0, 300.0).is_none());
+    }
+
+    #[test]
+    fn node_at_returns_none_without_graph() {
+        let engine = BloomEngine::new(800.0, 600.0);
+        assert!(engine.node_at(100.0, 100.0).is_none());
+    }
+
+    #[test]
     fn screen_positions_use_camera_and_canvas() {
         let nodes = &[(1, 0.0f32, 0u16), (2, 0.0, 0)];
         let data = build_blom(nodes, &[], None);
@@ -390,8 +445,10 @@ mod tests {
         engine.graph.as_mut().unwrap().nodes_mut()[1].x = 100.0;
         engine.graph.as_mut().unwrap().nodes_mut()[1].y = 0.0;
 
-        // Run the camera toward (0, 0) zoom 1 — load_graph's focus_on is a target,
-        // not an instant snap.
+        // `load_graph` calls `fit_to_bounds` on the randomised positions, which
+        // leaves the camera target somewhere arbitrary. Override it explicitly,
+        // then run the exponential smoother until it converges.
+        engine.camera.focus_on(0.0, 0.0, 1.0);
         for _ in 0..200 {
             engine.camera.update(0.016);
         }

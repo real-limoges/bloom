@@ -131,6 +131,50 @@ mod tests {
     }
 
     #[test]
+    fn enclosing_empty_iterator_is_none() {
+        assert!(AABB::enclosing(std::iter::empty()).is_none());
+    }
+
+    #[test]
+    fn enclosing_single_point_is_degenerate() {
+        let b = AABB::enclosing(std::iter::once((3.0, 4.0))).unwrap();
+        assert_eq!(b.min_x, 3.0);
+        assert_eq!(b.max_x, 3.0);
+        assert_eq!(b.min_y, 4.0);
+        assert_eq!(b.max_y, 4.0);
+        assert_eq!(b.width(), 0.0);
+        assert_eq!(b.height(), 0.0);
+    }
+
+    #[test]
+    fn enclosing_multiple_points() {
+        let pts = [(1.0, 5.0), (-2.0, 3.0), (4.0, -1.0), (0.0, 2.0)];
+        let b = AABB::enclosing(pts.into_iter()).unwrap();
+        assert_eq!(b.min_x, -2.0);
+        assert_eq!(b.max_x, 4.0);
+        assert_eq!(b.min_y, -1.0);
+        assert_eq!(b.max_y, 5.0);
+    }
+
+    #[test]
+    fn padded_zero_factor_still_adds_minimum() {
+        let b = world_bounds().padded(0.0);
+        // `padded` always adds +1.0 on each side even at factor 0
+        assert_eq!(b.min_x, -1.0);
+        assert_eq!(b.max_x, 101.0);
+        assert_eq!(b.min_y, -1.0);
+        assert_eq!(b.max_y, 101.0);
+    }
+
+    #[test]
+    fn padded_positive_factor_expands() {
+        let b = world_bounds().padded(0.1); // 10% + 1
+        assert!(b.width() > world_bounds().width());
+        assert!(b.height() > world_bounds().height());
+        assert_eq!(b.center(), world_bounds().center()); // center preserved
+    }
+
+    #[test]
     fn subdivide_produces_four_quadrants() {
         let b = world_bounds();
         let quads = b.subdivide();
