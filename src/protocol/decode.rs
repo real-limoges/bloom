@@ -66,6 +66,12 @@ impl<'a> Decoder<'a> {
                     .chain(std::iter::once(total_len)),
             )
             .map(|(start, end)| {
+                if start > end || end > string_data.len() {
+                    return Err(format!(
+                        "String table offset out of range: start={start} end={end} len={}",
+                        string_data.len()
+                    ));
+                }
                 std::str::from_utf8(&string_data[start..end])
                     .map(|s| s.to_string())
                     .map_err(|e| format!("Invalid UTF-8: {e}"))
@@ -171,6 +177,66 @@ mod tests {
         assert_eq!(graph.edge_count(), 1);
         assert_eq!(graph.edges()[0].source, 10);
         assert_eq!(graph.edges()[0].target, 20);
+    }
+
+    #[test]
+    fn decode_string_table_offset_out_of_range() {
+        use crate::protocol::format::{Flags, MAGIC, VERSION};
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&MAGIC.to_le_bytes());
+        buf.extend_from_slice(&VERSION.to_le_bytes());
+        buf.extend_from_slice(&1u32.to_le_bytes()); // 1 node
+        buf.extend_from_slice(&0u32.to_le_bytes()); // 0 edges
+        buf.extend_from_slice(&(Flags::HasLabels as u16).to_le_bytes());
+
+        // String table: total_len = 5, offsets = [100] (out of range)
+        buf.extend_from_slice(&5u32.to_le_bytes());
+        buf.extend_from_slice(&100u32.to_le_bytes());
+        buf.extend_from_slice(b"hello");
+
+        // Node data (enough so we reach the string-table decode)
+        buf.extend_from_slice(&1u32.to_le_bytes()); // id
+        buf.extend_from_slice(&0f32.to_le_bytes()); // pagerank
+        buf.extend_from_slice(&0u16.to_le_bytes()); // degree
+
+        let err = Decoder::new(&buf).decode_graph().unwrap_err();
+        assert!(
+            err.contains("out of range"),
+            "expected 'out of range' error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn decode_string_table_inverted_offsets() {
+        use crate::protocol::format::{Flags, MAGIC, VERSION};
+        let mut buf = Vec::new();
+        buf.extend_from_slice(&MAGIC.to_le_bytes());
+        buf.extend_from_slice(&VERSION.to_le_bytes());
+        buf.extend_from_slice(&2u32.to_le_bytes()); // 2 nodes
+        buf.extend_from_slice(&0u32.to_le_bytes()); // 0 edges
+        buf.extend_from_slice(&(Flags::HasLabels as u16).to_le_bytes());
+
+        // total_len = 5, offsets = [3, 1] (second < first — inverted pair)
+        buf.extend_from_slice(&5u32.to_le_bytes());
+        buf.extend_from_slice(&3u32.to_le_bytes());
+        buf.extend_from_slice(&1u32.to_le_bytes());
+        buf.extend_from_slice(b"hello");
+
+        for _ in 0..2 {
+            buf.extend_from_slice(&0u32.to_le_bytes());
+        }
+        for _ in 0..2 {
+            buf.extend_from_slice(&0f32.to_le_bytes());
+        }
+        for _ in 0..2 {
+            buf.extend_from_slice(&0u16.to_le_bytes());
+        }
+
+        let err = Decoder::new(&buf).decode_graph().unwrap_err();
+        assert!(
+            err.contains("out of range"),
+            "expected 'out of range' error, got: {err}"
+        );
     }
 
     #[test]

@@ -16,7 +16,7 @@ pub fn pagerank(graph: &Graph, iterations: usize, damping: f32) -> Vec<f32> {
         let mut next = vec![(1.0 - damping) / n as f32; n];
 
         for (i, node) in graph.nodes().iter().enumerate() {
-            let out_neighbors = graph.neighbors(node.id);
+            let out_neighbors = graph.out_neighbors(node.id);
             if out_neighbors.is_empty() {
                 // Dangling node: distribute evenly
                 let share = scores[i] * damping / n as f32;
@@ -154,6 +154,59 @@ mod tests {
             .unwrap()
             .0;
         assert_eq!(max_idx, 0, "hub node should rank highest");
+    }
+
+    #[test]
+    fn pagerank_respects_edge_direction() {
+        // A hub receiving all in-edges (no out-edges) is a dangling node.
+        // Leaves each send their rank to the hub. Under directed PageRank the
+        // hub should dominate; under the old (buggy) undirected implementation,
+        // the hub would also flow back to each leaf and the gap would shrink.
+        let nodes = vec![make_node(1), make_node(2), make_node(3), make_node(4)];
+        let edges = vec![
+            Edge {
+                source: 2,
+                target: 1,
+            },
+            Edge {
+                source: 3,
+                target: 1,
+            },
+            Edge {
+                source: 4,
+                target: 1,
+            },
+        ];
+        let g = Graph::new(nodes, edges);
+        let scores = pagerank(&g, 50, 0.85);
+
+        let hub = scores[0];
+        let leaves_max = scores[1..].iter().cloned().fold(f32::MIN, f32::max);
+        // Under correct directed PageRank the hub is > 2x the leaves.
+        assert!(
+            hub > leaves_max * 2.0,
+            "hub {hub} should dominate leaves (max leaf {leaves_max})"
+        );
+    }
+
+    #[test]
+    fn pagerank_two_node_cycle_symmetric() {
+        // 1 <-> 2: symmetric 2-cycle, each node should converge to 0.5.
+        let nodes = vec![make_node(1), make_node(2)];
+        let edges = vec![
+            Edge {
+                source: 1,
+                target: 2,
+            },
+            Edge {
+                source: 2,
+                target: 1,
+            },
+        ];
+        let g = Graph::new(nodes, edges);
+        let scores = pagerank(&g, 50, 0.85);
+        assert!((scores[0] - 0.5).abs() < 1e-4, "score0={}", scores[0]);
+        assert!((scores[1] - 0.5).abs() < 1e-4, "score1={}", scores[1]);
     }
 
     #[test]
