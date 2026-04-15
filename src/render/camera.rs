@@ -40,6 +40,33 @@ impl Camera {
         self.target_zoom = zoom;
     }
 
+    /// Fit an AABB into the canvas with a fractional padding margin (e.g. 0.1 = 10%
+    /// breathing room on each side). Sets targets — call `update` to converge.
+    pub fn fit_to_bounds(
+        &mut self,
+        min_x: f32,
+        min_y: f32,
+        max_x: f32,
+        max_y: f32,
+        canvas_w: f32,
+        canvas_h: f32,
+        padding: f32,
+    ) {
+        if canvas_w <= 0.0 || canvas_h <= 0.0 {
+            return;
+        }
+        let bbox_w = (max_x - min_x).max(1.0);
+        let bbox_h = (max_y - min_y).max(1.0);
+        let scale = 1.0 + padding * 2.0;
+        let zoom_x = canvas_w / (bbox_w * scale);
+        let zoom_y = canvas_h / (bbox_h * scale);
+        let zoom = zoom_x.min(zoom_y).clamp(0.01, 10.0);
+
+        self.target_x = (min_x + max_x) * 0.5;
+        self.target_y = (min_y + max_y) * 0.5;
+        self.target_zoom = zoom;
+    }
+
     pub fn world_to_screen(&self, wx: f32, wy: f32, canvas_w: f64, canvas_h: f64) -> (f64, f64) {
         let sx = ((wx - self.x) * self.zoom + canvas_w as f32 / 2.0) as f64;
         let sy = ((wy - self.y) * self.zoom + canvas_h as f32 / 2.0) as f64;

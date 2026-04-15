@@ -69,10 +69,23 @@ impl BloomEngine {
         let layout = ForceLayout::new(graph.node_count(), ForceParams::default());
         let quadtree = build_quadtree(&graph);
 
+        if let Some((min_x, min_y, max_x, max_y)) = percentile_bounds(graph.nodes(), 0.9) {
+            self.camera.fit_to_bounds(
+                min_x,
+                min_y,
+                max_x,
+                max_y,
+                self.canvas_width,
+                self.canvas_height,
+                0.1,
+            );
+        } else {
+            self.camera.focus_on(0.0, 0.0, 1.0);
+        }
+
         self.graph = Some(graph);
         self.layout = Some(layout);
         self.quadtree = Some(quadtree);
-        self.camera.focus_on(0.0, 0.0, 1.0);
 
         Ok(())
     }
@@ -81,6 +94,18 @@ impl BloomEngine {
         if let (Some(graph), Some(layout)) = (&mut self.graph, &mut self.layout) {
             layout.step(graph);
             self.quadtree = Some(build_quadtree(graph));
+
+            if let Some((min_x, min_y, max_x, max_y)) = percentile_bounds(graph.nodes(), 0.9) {
+                self.camera.fit_to_bounds(
+                    min_x,
+                    min_y,
+                    max_x,
+                    max_y,
+                    self.canvas_width,
+                    self.canvas_height,
+                    0.1,
+                );
+            }
         }
         self.camera.update(dt);
 
@@ -212,11 +237,48 @@ impl BloomEngine {
     pub fn camera(&self) -> &Camera {
         &self.camera
     }
+
+    /// Flat [x0, y0, x1, y1, ...] in canvas pixel coordinates for every node,
+    /// computed against the current camera. Empty if no graph is loaded.
+    /// Hot path for overlay renderers; avoid per-frame allocation churn downstream.
+    pub fn node_screen_positions(&self) -> Vec<f32> {
+        let Some(graph) = &self.graph else {
+            return Vec::new();
+        };
+        let w = self.canvas_width as f64;
+        let h = self.canvas_height as f64;
+        let nodes = graph.nodes();
+        let mut out = Vec::with_capacity(nodes.len() * 2);
+        for node in nodes {
+            let (sx, sy) = self.camera.world_to_screen(node.x, node.y, w, h);
+            out.push(sx as f32);
+            out.push(sy as f32);
+        }
+        out
+    }
 }
 
 fn lcg_next(state: u32) -> (u32, f32) {
     let state = state.wrapping_mul(1664525).wrapping_add(1013904223);
     (state, (state as f32 / u32::MAX as f32) * 2.0 - 1.0)
+}
+
+/// AABB of the middle `percentile` fraction of nodes per axis. Robust to outliers
+/// that drift far from the main cluster — fits the camera to the dense core
+/// instead of letting one or two stragglers dominate the frame.
+fn percentile_bounds(nodes: &[Node], percentile: f32) -> Option<(f32, f32, f32, f32)> {
+    if nodes.is_empty() {
+        return None;
+    }
+    let n = nodes.len();
+    let mut xs: Vec<f32> = nodes.iter().map(|node| node.x).collect();
+    let mut ys: Vec<f32> = nodes.iter().map(|node| node.y).collect();
+    xs.sort_by(|a, b| a.total_cmp(b));
+    ys.sort_by(|a, b| a.total_cmp(b));
+    let trim = (((n as f32) * (1.0 - percentile) * 0.5) as usize).min(n / 2);
+    let lo = trim;
+    let hi = (n - 1).saturating_sub(trim);
+    Some((xs[lo], ys[lo], xs[hi], ys[hi]))
 }
 
 fn build_quadtree(graph: &Graph) -> Quadtree {
@@ -313,6 +375,39 @@ mod tests {
         // Screen center = (400, 300), which maps to world ~(0,0)
         let hit = engine.node_at(400.0, 300.0);
         assert!(hit.is_some(), "should hit node near origin");
+    }
+
+    #[test]
+    fn screen_positions_use_camera_and_canvas() {
+        let nodes = &[(1, 0.0f32, 0u16), (2, 0.0, 0)];
+        let data = build_blom(nodes, &[], None);
+
+        let mut engine = BloomEngine::new(800.0, 600.0);
+        engine.load_graph(&data).unwrap();
+
+        engine.graph.as_mut().unwrap().nodes_mut()[0].x = 0.0;
+        engine.graph.as_mut().unwrap().nodes_mut()[0].y = 0.0;
+        engine.graph.as_mut().unwrap().nodes_mut()[1].x = 100.0;
+        engine.graph.as_mut().unwrap().nodes_mut()[1].y = 0.0;
+
+        // Run the camera toward (0, 0) zoom 1 — load_graph's focus_on is a target,
+        // not an instant snap.
+        for _ in 0..200 {
+            engine.camera.update(0.016);
+        }
+
+        let positions = engine.node_screen_positions();
+        assert_eq!(positions.len(), 4);
+        assert!((positions[0] - 400.0).abs() < 1e-2, "node0 x not at canvas center: {}", positions[0]);
+        assert!((positions[1] - 300.0).abs() < 1e-2, "node0 y not at canvas center: {}", positions[1]);
+        assert!((positions[2] - 500.0).abs() < 1e-2, "node1 x off: {}", positions[2]);
+        assert!((positions[3] - 300.0).abs() < 1e-2, "node1 y off: {}", positions[3]);
+    }
+
+    #[test]
+    fn screen_positions_empty_when_no_graph() {
+        let engine = BloomEngine::new(800.0, 600.0);
+        assert!(engine.node_screen_positions().is_empty());
     }
 
     #[test]

@@ -72,6 +72,46 @@ impl Graph {
             })
             .collect()
     }
+
+    /// Directed out-neighbor adjacency as CSR. `offsets` has length `node_count + 1`;
+    /// `neighbors[offsets[i]..offsets[i+1]]` are the graph-indices (not ids) of the
+    /// out-neighbors of node i. Intended for random-walk consumers on the JS side,
+    /// where per-step allocation would be a hot-path cost.
+    pub fn out_adjacency_csr(&self) -> (Vec<u32>, Vec<u32>) {
+        let n = self.nodes.len();
+        let mut counts = vec![0u32; n];
+        for edge in &self.edges {
+            if let (Some(&src_idx), Some(_)) = (
+                self.id_to_index.get(&edge.source),
+                self.id_to_index.get(&edge.target),
+            ) {
+                counts[src_idx] += 1;
+            }
+        }
+
+        let mut offsets = Vec::with_capacity(n + 1);
+        offsets.push(0u32);
+        let mut running = 0u32;
+        for c in &counts {
+            running += *c;
+            offsets.push(running);
+        }
+
+        let mut write_pos: Vec<u32> = offsets[..n].to_vec();
+        let mut neighbors = vec![0u32; running as usize];
+        for edge in &self.edges {
+            if let (Some(&src_idx), Some(&tgt_idx)) = (
+                self.id_to_index.get(&edge.source),
+                self.id_to_index.get(&edge.target),
+            ) {
+                let slot = write_pos[src_idx] as usize;
+                neighbors[slot] = tgt_idx as u32;
+                write_pos[src_idx] += 1;
+            }
+        }
+
+        (offsets, neighbors)
+    }
 }
 
 #[cfg(test)]
@@ -162,5 +202,50 @@ mod tests {
         g.nodes_mut()[0].y = 10.0;
         assert_eq!(g.nodes()[0].x, 5.0);
         assert_eq!(g.nodes()[0].y, 10.0);
+    }
+
+    #[test]
+    fn out_csr_directed_and_sinks() {
+        // 10 -> 20, 10 -> 30, 20 -> 30, 30 has no out-edges.
+        let nodes = vec![make_node(10), make_node(20), make_node(30)];
+        let edges = vec![
+            Edge { source: 10, target: 20 },
+            Edge { source: 10, target: 30 },
+            Edge { source: 20, target: 30 },
+        ];
+        let g = Graph::new(nodes, edges);
+        let (offsets, neighbors) = g.out_adjacency_csr();
+
+        assert_eq!(offsets, vec![0, 2, 3, 3]);
+        // Indices, not ids: node 10 -> index 0, node 20 -> 1, node 30 -> 2
+        let n10: Vec<u32> = neighbors[offsets[0] as usize..offsets[1] as usize].to_vec();
+        let mut n10_sorted = n10.clone();
+        n10_sorted.sort();
+        assert_eq!(n10_sorted, vec![1, 2]);
+        assert_eq!(&neighbors[offsets[1] as usize..offsets[2] as usize], &[2]);
+        assert_eq!(&neighbors[offsets[2] as usize..offsets[3] as usize], &[] as &[u32]);
+    }
+
+    #[test]
+    fn out_csr_empty_graph() {
+        let g = Graph::new(vec![], vec![]);
+        let (offsets, neighbors) = g.out_adjacency_csr();
+        assert_eq!(offsets, vec![0]);
+        assert!(neighbors.is_empty());
+    }
+
+    #[test]
+    fn out_csr_ignores_dangling_edges() {
+        // Edge references an id not in the node set — should be silently dropped.
+        let nodes = vec![make_node(10), make_node(20)];
+        let edges = vec![
+            Edge { source: 10, target: 20 },
+            Edge { source: 10, target: 999 },
+            Edge { source: 999, target: 20 },
+        ];
+        let g = Graph::new(nodes, edges);
+        let (offsets, neighbors) = g.out_adjacency_csr();
+        assert_eq!(offsets, vec![0, 1, 1]);
+        assert_eq!(neighbors, vec![1]);
     }
 }

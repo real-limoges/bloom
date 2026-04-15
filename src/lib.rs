@@ -59,4 +59,43 @@ impl BloomEngine {
             .await
             .map_err(|e| JsValue::from_str(&e))
     }
+
+    pub fn node_ids(&self) -> Vec<u32> {
+        self.inner
+            .graph()
+            .map(|g| g.nodes().iter().map(|n| n.id).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn node_pageranks(&self) -> Vec<f32> {
+        self.inner
+            .graph()
+            .map(|g| g.nodes().iter().map(|n| n.pagerank).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn adjacency_offsets(&self) -> Vec<u32> {
+        self.inner
+            .graph()
+            .map(|g| g.out_adjacency_csr().0)
+            .unwrap_or_default()
+    }
+
+    pub fn adjacency_neighbors(&self) -> Vec<u32> {
+        self.inner
+            .graph()
+            .map(|g| g.out_adjacency_csr().1)
+            .unwrap_or_default()
+    }
+
+    pub fn node_screen_positions(&self) -> Vec<f32> {
+        self.inner.node_screen_positions()
+    }
+
+    pub fn node_labels(&self) -> Vec<String> {
+        self.inner
+            .graph()
+            .map(|g| g.nodes().iter().map(|n| n.label.clone()).collect())
+            .unwrap_or_default()
+    }
 }
