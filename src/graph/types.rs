@@ -209,9 +209,18 @@ mod tests {
         // 10 -> 20, 10 -> 30, 20 -> 30, 30 has no out-edges.
         let nodes = vec![make_node(10), make_node(20), make_node(30)];
         let edges = vec![
-            Edge { source: 10, target: 20 },
-            Edge { source: 10, target: 30 },
-            Edge { source: 20, target: 30 },
+            Edge {
+                source: 10,
+                target: 20,
+            },
+            Edge {
+                source: 10,
+                target: 30,
+            },
+            Edge {
+                source: 20,
+                target: 30,
+            },
         ];
         let g = Graph::new(nodes, edges);
         let (offsets, neighbors) = g.out_adjacency_csr();
@@ -223,7 +232,10 @@ mod tests {
         n10_sorted.sort();
         assert_eq!(n10_sorted, vec![1, 2]);
         assert_eq!(&neighbors[offsets[1] as usize..offsets[2] as usize], &[2]);
-        assert_eq!(&neighbors[offsets[2] as usize..offsets[3] as usize], &[] as &[u32]);
+        assert_eq!(
+            &neighbors[offsets[2] as usize..offsets[3] as usize],
+            &[] as &[u32]
+        );
     }
 
     #[test]
@@ -239,9 +251,18 @@ mod tests {
         // Edge references an id not in the node set — should be silently dropped.
         let nodes = vec![make_node(10), make_node(20)];
         let edges = vec![
-            Edge { source: 10, target: 20 },
-            Edge { source: 10, target: 999 },
-            Edge { source: 999, target: 20 },
+            Edge {
+                source: 10,
+                target: 20,
+            },
+            Edge {
+                source: 10,
+                target: 999,
+            },
+            Edge {
+                source: 999,
+                target: 20,
+            },
         ];
         let g = Graph::new(nodes, edges);
         let (offsets, neighbors) = g.out_adjacency_csr();

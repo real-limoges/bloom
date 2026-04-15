@@ -398,10 +398,26 @@ mod tests {
 
         let positions = engine.node_screen_positions();
         assert_eq!(positions.len(), 4);
-        assert!((positions[0] - 400.0).abs() < 1e-2, "node0 x not at canvas center: {}", positions[0]);
-        assert!((positions[1] - 300.0).abs() < 1e-2, "node0 y not at canvas center: {}", positions[1]);
-        assert!((positions[2] - 500.0).abs() < 1e-2, "node1 x off: {}", positions[2]);
-        assert!((positions[3] - 300.0).abs() < 1e-2, "node1 y off: {}", positions[3]);
+        assert!(
+            (positions[0] - 400.0).abs() < 1e-2,
+            "node0 x not at canvas center: {}",
+            positions[0]
+        );
+        assert!(
+            (positions[1] - 300.0).abs() < 1e-2,
+            "node0 y not at canvas center: {}",
+            positions[1]
+        );
+        assert!(
+            (positions[2] - 500.0).abs() < 1e-2,
+            "node1 x off: {}",
+            positions[2]
+        );
+        assert!(
+            (positions[3] - 300.0).abs() < 1e-2,
+            "node1 y off: {}",
+            positions[3]
+        );
     }
 
     #[test]
