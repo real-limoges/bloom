@@ -102,13 +102,22 @@ impl QuadNode {
                 children,
             } => {
                 let delta = pos - *center_of_mass;
-                let dist = delta.length().max(EPSILON);
+                let raw_dist = delta.length();
+                // Query node sits exactly on the subtree's center of mass —
+                // either it's the only node in the subtree (no force to apply)
+                // or every node in the subtree is coincident with it (also no
+                // well-defined force). Without this guard, `delta.normalize()`
+                // would return NaN below in the s=0 / degenerate-bounds path.
+                if raw_dist < EPSILON {
+                    return Vec2::ZERO;
+                }
+                let dist = raw_dist;
                 let s = bounds.width().max(bounds.height());
 
                 if s / dist < theta {
                     // Treat as single body
-                    let dist = dist.max(MIN_DIST);
-                    delta.normalize() * (repulsion * *total_mass / (dist * dist))
+                    let dist_div = dist.max(MIN_DIST);
+                    delta / dist * (repulsion * *total_mass / (dist_div * dist_div))
                 } else {
                     let sub_bounds = bounds.subdivide();
                     children

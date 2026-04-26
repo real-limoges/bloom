@@ -47,6 +47,15 @@ impl Camera {
         if canvas_w <= 0.0 || canvas_h <= 0.0 {
             return;
         }
+        // A NaN in any component would propagate into the camera target and
+        // freeze it there forever. Skip and keep the previous target.
+        if !(bounds.min_x.is_finite()
+            && bounds.min_y.is_finite()
+            && bounds.max_x.is_finite()
+            && bounds.max_y.is_finite())
+        {
+            return;
+        }
         let bbox_w = bounds.width().max(1.0);
         let bbox_h = bounds.height().max(1.0);
         let scale = 1.0 + padding * 2.0;
