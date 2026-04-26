@@ -202,9 +202,18 @@ mod tests {
             })
             .collect();
         let edges = vec![
-            Edge { source: 0, target: 0 }, // self-loop
-            Edge { source: 0, target: 1 },
-            Edge { source: 1, target: 2 },
+            Edge {
+                source: 0,
+                target: 0,
+            }, // self-loop
+            Edge {
+                source: 0,
+                target: 1,
+            },
+            Edge {
+                source: 1,
+                target: 2,
+            },
         ];
         let mut graph = Graph::new(nodes, edges);
         let mut layout = ForceLayout::new(3, ForceParams::default());
@@ -212,7 +221,11 @@ mod tests {
         for _ in 0..10 {
             layout.step(&mut graph);
             for n in graph.nodes() {
-                assert!(n.x.is_finite() && n.y.is_finite(), "NaN escaped: {:?}", (n.x, n.y));
+                assert!(
+                    n.x.is_finite() && n.y.is_finite(),
+                    "NaN escaped: {:?}",
+                    (n.x, n.y)
+                );
             }
         }
     }
@@ -233,10 +246,16 @@ mod tests {
             })
             .collect();
         let mut edges: Vec<Edge> = (0..n)
-            .map(|i| Edge { source: i as u32, target: ((i + 1) % n) as u32 })
+            .map(|i| Edge {
+                source: i as u32,
+                target: ((i + 1) % n) as u32,
+            })
             .collect();
         for i in 0..n {
-            edges.push(Edge { source: i as u32, target: ((i + 7) % n) as u32 });
+            edges.push(Edge {
+                source: i as u32,
+                target: ((i + 7) % n) as u32,
+            });
         }
         let mut graph = Graph::new(nodes, edges);
         let mut layout = ForceLayout::new(n, ForceParams::default());
@@ -268,7 +287,10 @@ mod tests {
             })
             .collect();
         let edges: Vec<Edge> = (0..n)
-            .map(|i| Edge { source: i as u32, target: ((i + 1) % n) as u32 })
+            .map(|i| Edge {
+                source: i as u32,
+                target: ((i + 1) % n) as u32,
+            })
             .collect();
         let mut graph = Graph::new(nodes, edges);
         let mut layout = ForceLayout::new(n, ForceParams::default());
@@ -298,14 +320,21 @@ mod tests {
         // Two nodes at exactly the same position connected by an edge —
         // `delta.length()` is zero, `normalize()` would NaN without a guard.
         let nodes: Vec<Node> = (0..2).map(make_node).collect();
-        let edges = vec![Edge { source: 0, target: 1 }];
+        let edges = vec![Edge {
+            source: 0,
+            target: 1,
+        }];
         let mut graph = Graph::new(nodes, edges);
         let mut layout = ForceLayout::new(2, ForceParams::default());
 
         for _ in 0..10 {
             layout.step(&mut graph);
             for n in graph.nodes() {
-                assert!(n.x.is_finite() && n.y.is_finite(), "NaN escaped: {:?}", (n.x, n.y));
+                assert!(
+                    n.x.is_finite() && n.y.is_finite(),
+                    "NaN escaped: {:?}",
+                    (n.x, n.y)
+                );
             }
         }
     }
