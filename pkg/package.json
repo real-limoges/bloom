@@ -11,13 +11,11 @@
   "files": [
     "bloom_bg.wasm",
     "bloom.js",
-    "bloom_bg.js",
     "bloom.d.ts"
   ],
   "main": "bloom.js",
   "types": "bloom.d.ts",
   "sideEffects": [
-    "./bloom.js",
     "./snippets/*"
   ]
 }
